@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, UIEvent } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Stats, LevelInfo, Achievement, Plant, User, Community } from '../types';
 import CommunitiesScreen from './CommunitiesScreen';
 import StatsScreen from './StatsScreen';
@@ -25,8 +25,6 @@ interface ProfileScreenProps {
 
 type ProfileTab = 'stats' | 'achievements' | 'communities';
 
-const TABS: ProfileTab[] = ['stats', 'achievements', 'communities'];
-
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, achievements, plants, communities, onJoinCommunity, onLeaveCommunity, onUpdateUser, searchUserByTelegram, addFriend }) => {
     const [activeTab, setActiveTab] = useState<ProfileTab>('stats');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -36,27 +34,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, a
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResult, setSearchResult] = useState<User | 'not_found' | null>(null);
     const [showSearchResultActions, setShowSearchResultActions] = useState<string | null>(null);
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const scrollEndTimer = useRef<number | null>(null);
 
     useEffect(() => {
         setEditableUser(user);
     }, [user]);
-
-    useEffect(() => {
-        if (scrollContainerRef.current) {
-            const tabIndex = TABS.indexOf(activeTab);
-            const container = scrollContainerRef.current;
-            const targetScrollLeft = container.offsetWidth * tabIndex;
-
-            if (Math.abs(container.scrollLeft - targetScrollLeft) > 1) {
-                container.scrollTo({
-                    left: targetScrollLeft,
-                    behavior: 'smooth',
-                });
-            }
-        }
-    }, [activeTab]);
 
     const handleOpenModal = () => {
         setEditableUser(user);
@@ -105,22 +86,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, a
     const handleTabClick = (tab: ProfileTab) => {
         setActiveTab(tab);
     };
-
-    const handleScroll = (e: UIEvent<HTMLDivElement>) => {
-        // FIX: Added a check to ensure scrollEndTimer.current is valid before calling clearTimeout.
-        if (scrollEndTimer.current) {
-            clearTimeout(scrollEndTimer.current);
-        }
-        scrollEndTimer.current = window.setTimeout(() => {
-            const container = e.currentTarget;
-            const pageIndex = Math.round(container.scrollLeft / container.offsetWidth);
-            const newTab = TABS[pageIndex];
-            if (newTab && newTab !== activeTab) {
-                setActiveTab(newTab);
-            }
-        }, 100);
-    };
-
 
     const renderTabs = () => (
         <div className="flex bg-card border border-accent rounded-full p-1 mb-6">
@@ -231,22 +196,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, a
             
             {renderTabs()}
             
-            <div
-                ref={scrollContainerRef}
-                onScroll={handleScroll}
-                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
-            >
-                <div className="w-full flex-shrink-0 snap-start">
-                    <StatsScreen stats={stats} plants={plants} />
-                </div>
-                <div className="w-full flex-shrink-0 snap-start">
-                    <AchievementsScreen achievements={achievements} />
-                </div>
-                <div className="w-full flex-shrink-0 snap-start">
-                    <CommunitiesScreen communities={communities} onJoin={onJoinCommunity} onLeave={onLeaveCommunity} />
-                </div>
+            <div>
+                {activeTab === 'stats' && <StatsScreen stats={stats} plants={plants} />}
+                {activeTab === 'achievements' && <AchievementsScreen achievements={achievements} />}
+                {activeTab === 'communities' && <CommunitiesScreen communities={communities} onJoin={onJoinCommunity} onLeave={onLeaveCommunity} />}
             </div>
-
 
             {isEditModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={() => setIsEditModalOpen(false)}>
