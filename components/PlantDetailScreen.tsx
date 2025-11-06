@@ -21,6 +21,7 @@ interface PlantDetailScreenProps {
 
 const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, onUpdatePlant, onLogCareEvent, onDeletePlant }) => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [editablePlant, setEditablePlant] = useState(plant);
     
     const initialSchedule = useMemo(() => ({
@@ -92,10 +93,8 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
         setIsScheduleDirty(false);
     };
     
-    const handleDelete = () => {
-        if (window.confirm(`Вы уверены, что хотите выкорчевать "${plant.name}"? Это действие необратимо.`)) {
-            onDeletePlant(plant.id);
-        }
+    const handleConfirmDelete = () => {
+        onDeletePlant(plant.id);
     };
 
     const careActions = useMemo(() => [
@@ -214,7 +213,7 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
             {/* Delete Button Section */}
             <div className="mt-8 border-t border-red-500/20 pt-6">
                 <button
-                    onClick={handleDelete}
+                    onClick={() => setIsDeleteConfirmOpen(true)}
                     className="w-full flex items-center justify-center gap-2 text-center px-4 py-2.5 bg-red-500/10 text-red-500 rounded-lg font-semibold hover:bg-red-500/20 transition-colors"
                 >
                     <TrashIcon className="w-5 h-5" />
@@ -276,6 +275,32 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
                             <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 rounded-full text-sm font-semibold hover:bg-accent transition-colors">Отмена</button>
                             <button onClick={handleSaveChanges} className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2">
                                 <SaveIcon className="w-4 h-4"/> Сохранить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Delete Confirmation Modal */}
+            {isDeleteConfirmOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsDeleteConfirmOpen(false)}>
+                    <div className="bg-card rounded-2xl w-full max-w-sm p-6 animate-fade-in-up text-center" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-xl font-bold mb-2">Подтвердите действие</h2>
+                        <p className="text-foreground/80 mb-6">
+                            Вы уверены, что хотите выкорчевать "{plant.name}"? Это действие необратимо.
+                        </p>
+                        <div className="flex justify-center gap-4">
+                            <button 
+                                onClick={() => setIsDeleteConfirmOpen(false)} 
+                                className="px-6 py-2 rounded-full text-sm font-semibold hover:bg-accent transition-colors"
+                            >
+                                Отмена
+                            </button>
+                            <button 
+                                onClick={handleConfirmDelete} 
+                                className="px-6 py-2 bg-red-600 text-white rounded-full text-sm font-semibold hover:bg-red-700 transition-colors"
+                            >
+                                Удалить
                             </button>
                         </div>
                     </div>
