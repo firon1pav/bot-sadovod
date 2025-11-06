@@ -12,6 +12,7 @@ import {
   AchievementRarity,
   User,
   Friend,
+  Community,
 } from '../types';
 import { CARE_XP_REWARDS, DEFAULT_WATERING_FREQUENCY, XP_LEVELS } from '../constants';
 
@@ -150,6 +151,14 @@ const initialUserAchievements: UserAchievement[] = [
     { id: 'uach2', userId: 'user1', achievementId: 'ach3', earnedAt: new Date() },
 ];
 
+const initialCommunities: Community[] = [
+    { id: 'comm1', name: 'Любители суккулентов', description: 'Все о кактусах и суккулентах. Делимся фото и советами по уходу.', photoUrl: 'https://images.unsplash.com/photo-1519336428358-708b9b5f0e31?w=200&h=200&fit=crop', memberCount: 1245, isMember: true },
+    { id: 'comm2', name: 'Орхидеи для всех', description: 'Помощь новичкам и обсуждения для опытных владельцев орхидей.', photoUrl: 'https://images.unsplash.com/photo-1557080922-3c348148a127?w=200&h=200&fit=crop', memberCount: 876, isMember: false },
+    { id: 'comm3', name: 'Городские джунгли', description: 'Превращаем квартиры в зеленые оазисы. Идеи, лайфхаки, вдохновение.', photoUrl: 'https://images.unsplash.com/photo-1614594975525-e4d524c4d697?w=200&h=200&fit=crop', memberCount: 2310, isMember: true },
+    { id: 'comm4', name: 'Балконное садоводство', description: 'Выращиваем овощи, травы и цветы на балконах и лоджиях.', photoUrl: 'https://images.unsplash.com/photo-1588122093712-c158397a69b4?w=200&h=200&fit=crop', memberCount: 654, isMember: false },
+    { id: 'comm5', name: 'Редкие и экзотические', description: 'Коллекционеры редких видов растений. Обмен и продажа.', photoUrl: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=200&h=200&fit=crop', memberCount: 432, isMember: false },
+];
+
 export default function useMockData() {
   const [user, setUser] = useState<User>(initialUser);
   const [plants, setPlants] = useState<Plant[]>(initialPlants);
@@ -157,6 +166,7 @@ export default function useMockData() {
   const [stats, setStats] = useState<Stats>(initialStats);
   const [xp, setXp] = useState(250); // initial XP
   const [userAchievements, setUserAchievements] = useState<UserAchievement[]>(initialUserAchievements);
+  const [communities, setCommunities] = useState<Community[]>(initialCommunities);
   
   const achievementsMap = useMemo(() => new Map(allAchievements.map(a => [a.code, a])), []);
 
@@ -397,6 +407,14 @@ export default function useMockData() {
     }));
   }, [user.id, user.friends]);
 
+  const joinCommunity = useCallback((communityId: string) => {
+    setCommunities(prev => prev.map(c => c.id === communityId ? { ...c, isMember: true, memberCount: c.memberCount + 1 } : c));
+  }, []);
+
+  const leaveCommunity = useCallback((communityId: string) => {
+    setCommunities(prev => prev.map(c => c.id === communityId ? { ...c, isMember: false, memberCount: c.memberCount - 1 } : c));
+  }, []);
+
 
   return {
     user,
@@ -405,6 +423,7 @@ export default function useMockData() {
     stats,
     levelInfo,
     achievements,
+    communities,
     addPlant,
     updatePlant,
     deletePlant,
@@ -412,5 +431,7 @@ export default function useMockData() {
     updateUser,
     searchUserByTelegram,
     addFriend,
+    joinCommunity,
+    leaveCommunity,
   };
 }

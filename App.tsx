@@ -14,10 +14,10 @@ const App: React.FC = () => {
   const {
     user,
     plants,
-    careEvents,
     stats,
     levelInfo,
     achievements,
+    communities,
     addPlant,
     updatePlant,
     deletePlant,
@@ -25,6 +25,8 @@ const App: React.FC = () => {
     updateUser,
     searchUserByTelegram,
     addFriend,
+    joinCommunity,
+    leaveCommunity,
   } = useMockData();
 
   const [activeScreen, setActiveScreen] = useState('Сад');
@@ -101,7 +103,9 @@ const App: React.FC = () => {
                 levelInfo={levelInfo}
                 achievements={achievements}
                 plants={plants}
-                careEvents={careEvents}
+                communities={communities}
+                onJoinCommunity={joinCommunity}
+                onLeaveCommunity={leaveCommunity}
                 onUpdateUser={updateUser}
                 searchUserByTelegram={searchUserByTelegram}
                 addFriend={addFriend}

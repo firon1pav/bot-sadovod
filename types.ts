@@ -117,3 +117,12 @@ export interface User {
     about: string;
     friends: Friend[];
 }
+
+export interface Community {
+    id: string;
+    name: string;
+    description: string;
+    photoUrl: string;
+    memberCount: number;
+    isMember: boolean;
+}
