@@ -1,222 +1,228 @@
-import { useState, useMemo } from 'react';
-import { Plant, Stats, LevelProgress, CareType, PlantLocation, PlantType, LevelInfo, CareEvent } from '../types';
-import { XP_LEVELS, CARE_XP_REWARDS, DEFAULT_WATERING_FREQUENCY } from '../constants';
+import { useState, useCallback, useMemo } from 'react';
+import {
+  Plant,
+  CareEvent,
+  CareType,
+  Stats,
+  LevelInfo,
+  Achievement,
+  UserAchievement,
+  PlantLocation,
+  PlantType,
+  AchievementRarity,
+} from '../types';
+import { CARE_XP_REWARDS, DEFAULT_WATERING_FREQUENCY, XP_LEVELS } from '../constants';
+
+// Simple uuid v4 mock, as we can't add new dependencies.
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+// --- MOCK DATA ---
+
+const initialUser = {
+  id: 'user1',
+  name: 'Анна',
+  photoUrl: 'https://i.pravatar.cc/150?u=user1',
+};
 
 const initialPlants: Plant[] = [
   {
-    id: '1',
+    id: 'plant1',
     userId: 'user1',
-    name: 'Monstera',
-    photoUrl: 'https://picsum.photos/id/106/400/400',
+    name: 'Монстера',
+    photoUrl: 'https://images.unsplash.com/photo-1591696205602-2f950c417cb9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=60',
     location: PlantLocation.HOME,
     type: PlantType.FOLIAGE,
-    lastWateredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-    wateringFrequencyDays: 5,
+    lastWateredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
     createdAt: new Date(),
-    lastFertilizedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-    nextFertilizingDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000), // in 4 days
-    lastTrimmedAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000),
-    nextTrimmingDate: new Date(Date.now() + 50 * 24 * 60 * 60 * 1000), // in 50 days
+    wateringFrequencyDays: 5,
+    lastFertilizedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    nextFertilizingDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
   },
   {
-    id: '2',
+    id: 'plant2',
     userId: 'user1',
-    name: 'Snake Plant',
-    photoUrl: 'https://picsum.photos/id/1015/400/400',
+    name: 'Фикус',
+    photoUrl: 'https://images.unsplash.com/photo-1614594975525-e4d524c4d697?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=60',
     location: PlantLocation.OFFICE,
-    type: PlantType.SUCCULENT,
-    lastWateredAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago - due today
-    wateringFrequencyDays: 14,
-    createdAt: new Date(),
-  },
-   {
-    id: '3',
-    userId: 'user1',
-    name: 'Fiddle Leaf',
-    photoUrl: 'https://picsum.photos/id/1025/400/400',
-    location: PlantLocation.BALCONY,
     type: PlantType.FOLIAGE,
-    lastWateredAt: new Date(), // today
+    lastWateredAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(),
     wateringFrequencyDays: 7,
+  },
+  {
+    id: 'plant3',
+    userId: 'user1',
+    name: 'Суккулент',
+    photoUrl: 'https://images.unsplash.com/photo-1509423350716-97f9360b4e2c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=60',
+    location: PlantLocation.HOME,
+    type: PlantType.SUCCULENT,
+    lastWateredAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(),
+    wateringFrequencyDays: 14,
+    nextRepottingDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+  },
+];
+
+const initialCareEvents: CareEvent[] = [
+  {
+    id: 'event1',
+    userId: 'user1',
+    plantId: 'plant1',
+    type: CareType.WATER,
+    occurredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
     createdAt: new Date(),
   },
 ];
 
 const initialStats: Stats = {
   userId: 'user1',
-  totalWaterings: 42,
-  streakWater: 5,
+  totalWaterings: 12,
+  streakWater: 3,
 };
 
-const initialLevelProgress: LevelProgress = {
-  userId: 'user1',
-  xp: 120,
-  level: 2,
-};
-
-const initialCareEvents: CareEvent[] = [
-    { id: 'ce1', userId: 'user1', plantId: '1', type: CareType.WATER, occurredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), createdAt: new Date() },
-    { id: 'ce2', userId: 'user1', plantId: '2', type: CareType.WATER, occurredAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), createdAt: new Date() },
-    { id: 'ce3', userId: 'user1', plantId: '3', type: CareType.WATER, occurredAt: new Date(), createdAt: new Date() },
-    { id: 'ce4', userId: 'user1', plantId: '1', type: CareType.FERTILIZE, occurredAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), note: 'Использовал удобрение для роста', createdAt: new Date() },
-    { id: 'ce5', userId: 'user1', plantId: '3', type: CareType.TRIM, occurredAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), note: 'Удалил сухие листья', createdAt: new Date() },
+const allAchievements: Achievement[] = [
+    { id: 'ach1', code: 'FIRST_PLANT', name: 'Начинающий садовод', description: 'Добавить первое растение', icon: '🌱', rarity: AchievementRarity.COMMON },
+    { id: 'ach2', code: 'FIVE_PLANTS', name: 'Коллекционер', description: 'Вырастить 5 растений', icon: '🪴', rarity: AchievementRarity.RARE },
+    { id: 'ach3', code: 'FIRST_WATER', name: 'Первая капля', description: 'Полить растение в первый раз', icon: '💧', rarity: AchievementRarity.COMMON },
+    { id: 'ach4', code: 'STREAK_7', name: 'Точность', description: 'Серия поливов в 7 дней', icon: '🎯', rarity: AchievementRarity.EPIC },
 ];
 
-const initialUser = {
-  id: 'user1',
-  name: 'Gardener',
-  photoUrl: 'https://picsum.photos/id/237/200/200',
-};
+const initialUserAchievements: UserAchievement[] = [
+    { id: 'uach1', userId: 'user1', achievementId: 'ach1', earnedAt: new Date() },
+    { id: 'uach2', userId: 'user1', achievementId: 'ach3', earnedAt: new Date() },
+];
 
-
-export const useMockData = () => {
+export default function useMockData() {
+  const [user] = useState(initialUser);
   const [plants, setPlants] = useState<Plant[]>(initialPlants);
-  const [stats, setStats] = useState<Stats>(initialStats);
-  const [levelProgress, setLevelProgress] = useState<LevelProgress>(initialLevelProgress);
   const [careEvents, setCareEvents] = useState<CareEvent[]>(initialCareEvents);
-  const [user, setUser] = useState(initialUser);
+  const [stats, setStats] = useState<Stats>(initialStats);
+  const [xp, setXp] = useState(250); // initial XP
+  const [userAchievements, setUserAchievements] = useState<UserAchievement[]>(initialUserAchievements);
 
-  const levelInfo: LevelInfo = useMemo(() => {
-    const currentLevelData = XP_LEVELS.find(l => l.level === levelProgress.level) || XP_LEVELS[0];
-    const nextLevelData = XP_LEVELS.find(l => l.level === levelProgress.level + 1);
+  const addPlant = useCallback((newPlantData: Omit<Plant, 'id' | 'createdAt'>) => {
+    const newPlant: Plant = {
+      ...newPlantData,
+      id: uuidv4(),
+      createdAt: new Date(),
+      wateringFrequencyDays: DEFAULT_WATERING_FREQUENCY[newPlantData.type] || DEFAULT_WATERING_FREQUENCY[PlantType.OTHER],
+    };
+    setPlants(prev => [...prev, newPlant]);
+    // Potentially award achievement for first plant
+    if (!userAchievements.some(a => a.achievementId === 'ach1')) {
+        setUserAchievements(prev => [...prev, { id: uuidv4(), userId: user.id, achievementId: 'ach1', earnedAt: new Date() }]);
+    }
+  }, [user.id, userAchievements]);
 
-    const nextLevelXp = nextLevelData ? nextLevelData.minXp : levelProgress.xp;
-    const currentLevelMinXp = currentLevelData.minXp;
+  const updatePlant = useCallback((plantId: string, updatedData: Partial<Omit<Plant, 'id'>>) => {
+    setPlants(prev => prev.map(p => p.id === plantId ? { ...p, ...updatedData } : p));
+  }, []);
+
+  const deletePlant = useCallback((plantId: string) => {
+    setPlants(prev => prev.filter(p => p.id !== plantId));
+  }, []);
+
+  const logCare = useCallback((plantId: string, careType: CareType) => {
+    const newEvent: CareEvent = {
+      id: uuidv4(),
+      userId: user.id,
+      plantId,
+      type: careType,
+      occurredAt: new Date(),
+      createdAt: new Date(),
+    };
+    setCareEvents(prev => [newEvent, ...prev]);
+
+    const xpGained = CARE_XP_REWARDS[careType] || 0;
+    setXp(prev => prev + xpGained);
+
+    setPlants(prev => prev.map(p => {
+      if (p.id === plantId) {
+        const updates: Partial<Plant> = {};
+        switch(careType) {
+          case CareType.WATER:
+            updates.lastWateredAt = new Date();
+            break;
+          case CareType.FERTILIZE:
+            updates.lastFertilizedAt = new Date();
+            updates.nextFertilizingDate = undefined; // Reset until user sets a new one
+            break;
+          case CareType.REPOT:
+            updates.lastRepottedAt = new Date();
+            updates.nextRepottingDate = undefined; // Reset
+            break;
+          case CareType.TRIM:
+            updates.lastTrimmedAt = new Date();
+            updates.nextTrimmingDate = undefined; // Reset
+            break;
+        }
+        return { ...p, ...updates };
+      }
+      return p;
+    }));
+
+    if (careType === CareType.WATER) {
+      setStats(prev => ({
+        ...prev,
+        totalWaterings: prev.totalWaterings + 1,
+        // In a real app, this logic would be more complex, checking dates to not break the streak.
+        // For this mock, we just increment.
+        streakWater: prev.streakWater + 1, 
+      }));
+    }
     
-    const xpInLevel = levelProgress.xp - currentLevelMinXp;
-    const xpForNextLevel = nextLevelXp - currentLevelMinXp;
+    // Potentially award achievement for first watering
+    if (!userAchievements.some(a => a.achievementId === 'ach3')) {
+        setUserAchievements(prev => [...prev, { id: uuidv4(), userId: user.id, achievementId: 'ach3', earnedAt: new Date() }]);
+    }
 
-    const progressPercentage = xpForNextLevel > 0 ? Math.floor((xpInLevel / xpForNextLevel) * 100) : 100;
+  }, [user.id, userAchievements]);
+  
+  const levelInfo = useMemo<LevelInfo>(() => {
+    const currentLevelData = [...XP_LEVELS].reverse().find(l => xp >= l.minXp) || XP_LEVELS[0];
+    const nextLevelData = XP_LEVELS.find(l => l.level === currentLevelData.level + 1);
 
+    const levelXp = xp - currentLevelData.minXp;
+    const nextLevelXpTotal = nextLevelData ? nextLevelData.minXp - currentLevelData.minXp : levelXp;
+    const progressPercentage = nextLevelData ? (levelXp / nextLevelXpTotal) * 100 : 100;
+    
     return {
-      ...levelProgress,
+      userId: user.id,
+      xp,
+      level: currentLevelData.level,
       levelName: currentLevelData.name,
       levelIcon: currentLevelData.icon,
-      nextLevelXp,
-      progressPercentage,
+      nextLevelXp: nextLevelData ? nextLevelData.minXp : xp,
+      progressPercentage: Math.min(100, progressPercentage),
     };
-  }, [levelProgress]);
-  
-  const updateLevel = (newXp: number) => {
-    setLevelProgress(currentProgress => {
-      const totalXp = currentProgress.xp + newXp;
-      const newLevelData = [...XP_LEVELS].reverse().find(l => totalXp >= l.minXp);
+  }, [xp, user.id]);
+
+  const achievements = useMemo(() => {
+    return allAchievements.map(ach => {
+      const userAch = userAchievements.find(ua => ua.achievementId === ach.id);
       return {
-        ...currentProgress,
-        xp: totalXp,
-        level: newLevelData ? newLevelData.level : currentProgress.level,
+        ...ach,
+        earnedAt: userAch?.earnedAt,
       };
     });
+  }, [userAchievements]);
+
+  return {
+    user,
+    plants,
+    careEvents,
+    stats,
+    levelInfo,
+    achievements,
+    addPlant,
+    updatePlant,
+    deletePlant,
+    logCare,
   };
-
-  const addPlant = (newPlantData: Omit<Plant, 'id' | 'createdAt'>) => {
-    const plant: Plant = {
-      ...newPlantData,
-      id: new Date().toISOString(),
-      createdAt: new Date(),
-      wateringFrequencyDays: newPlantData.wateringFrequencyDays || DEFAULT_WATERING_FREQUENCY[newPlantData.type],
-    };
-    setPlants(currentPlants => [...currentPlants, plant]);
-  };
-  
-  const updatePlant = (plantId: string, updatedData: Partial<Omit<Plant, 'id'>>) => {
-    setPlants(currentPlants => 
-        currentPlants.map(p => 
-            p.id === plantId ? { ...p, ...updatedData } : p
-        )
-    );
-  };
-
-  const deletePlant = (plantId: string) => {
-    setPlants(currentPlants => currentPlants.filter(p => p.id !== plantId));
-    setCareEvents(currentEvents => currentEvents.filter(e => e.plantId !== plantId));
-  };
-
-  const logCareEvent = (plantId: string, type: CareType, note?: string) => {
-    const newEvent: CareEvent = {
-        id: new Date().toISOString(),
-        userId: 'user1',
-        plantId,
-        type,
-        occurredAt: new Date(),
-        createdAt: new Date(),
-        note,
-    };
-    setCareEvents(currentEvents => [newEvent, ...currentEvents]);
-    
-    updateLevel(CARE_XP_REWARDS[type] || 0);
-
-    setPlants(currentPlants =>
-      currentPlants.map(p => {
-        if (p.id === plantId) {
-          const updatedPlant = { ...p };
-          const nextYear = new Date();
-          nextYear.setFullYear(nextYear.getFullYear() + 1);
-
-          switch(type) {
-            case CareType.WATER:
-              updatedPlant.lastWateredAt = new Date();
-              break;
-            case CareType.FERTILIZE:
-              updatedPlant.lastFertilizedAt = new Date();
-              updatedPlant.nextFertilizingDate = nextYear;
-              break;
-            case CareType.REPOT:
-              updatedPlant.lastRepottedAt = new Date();
-              updatedPlant.nextRepottingDate = nextYear;
-              break;
-            case CareType.TRIM:
-              updatedPlant.lastTrimmedAt = new Date();
-              updatedPlant.nextTrimmingDate = nextYear;
-              break;
-          }
-          return updatedPlant;
-        }
-        return p;
-      })
-    );
-      
-    if (type === CareType.WATER) {
-        setStats(currentStats => ({
-            ...currentStats,
-            totalWaterings: currentStats.totalWaterings + 1,
-            streakWater: currentStats.streakWater + 1, // Simplified streak logic
-        }));
-    }
-  };
-  
-  const waterAllDuePlants = () => {
-    let wateredCount = 0;
-    const newEvents: CareEvent[] = [];
-    setPlants(currentPlants =>
-      currentPlants.map(p => {
-        const daysSinceWatered = (new Date().getTime() - p.lastWateredAt.getTime()) / (1000 * 3600 * 24);
-        if (daysSinceWatered >= p.wateringFrequencyDays) {
-          wateredCount++;
-          newEvents.push({
-            id: new Date().toISOString() + p.id,
-            userId: 'user1',
-            plantId: p.id,
-            type: CareType.WATER,
-            occurredAt: new Date(),
-            createdAt: new Date(),
-          });
-          return { ...p, lastWateredAt: new Date() };
-        }
-        return p;
-      })
-    );
-
-    if(wateredCount > 0){
-        setCareEvents(currentEvents => [...newEvents, ...currentEvents]);
-        setStats(currentStats => ({
-            ...currentStats,
-            totalWaterings: currentStats.totalWaterings + wateredCount,
-            streakWater: currentStats.streakWater + wateredCount,
-        }));
-        updateLevel(CARE_XP_REWARDS.WATER * wateredCount);
-    }
-  };
-
-  return { plants, stats, levelInfo, addPlant, logCareEvent, waterAllDuePlants, careEvents, updatePlant, user, deletePlant };
-};
+}
