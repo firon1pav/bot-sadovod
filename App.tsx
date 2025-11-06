@@ -22,18 +22,14 @@ const App: React.FC = () => {
     updatePlant,
     deletePlant,
     logCare,
+    updateUser,
+    searchUserByTelegram,
+    addFriend,
   } = useMockData();
 
   const [activeScreen, setActiveScreen] = useState('Сад');
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isAddPlantModalOpen, setIsAddPlantModalOpen] = useState(false);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
-
-  useEffect(() => {
-    document.body.classList.toggle('dark', isDarkMode);
-  }, [isDarkMode]);
-
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
   const handleSelectPlant = (plant: Plant) => {
     setSelectedPlant(plant);
@@ -106,6 +102,9 @@ const App: React.FC = () => {
                 achievements={achievements}
                 plants={plants}
                 careEvents={careEvents}
+                onUpdateUser={updateUser}
+                searchUserByTelegram={searchUserByTelegram}
+                addFriend={addFriend}
             />
         );
       default:
@@ -114,9 +113,9 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`bg-background text-foreground min-h-screen font-sans ${isDarkMode ? 'dark' : ''}`}>
+    <div className="dark bg-background text-foreground min-h-screen font-sans">
         <div className="max-w-lg mx-auto pb-24">
-            <Header levelInfo={levelInfo} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+            <Header levelInfo={levelInfo} />
             <main className="p-4">
                 {renderScreen()}
             </main>

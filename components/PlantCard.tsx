@@ -23,10 +23,7 @@ const PlantCard: React.FC<PlantCardProps> = ({ plant, onLogCare, onSelect }) => 
     if (daysSinceWatered > plant.wateringFrequencyDays) {
       return { mood: '🥀', text: 'Жаждет!', color: 'text-red-500' };
     }
-    if (daysSinceWatered > plant.wateringFrequencyDays * 0.7) {
-      return { mood: '🙂', text: 'В порядке', color: 'text-yellow-500' };
-    }
-    return { mood: '😃', text: 'Счастливо!', color: 'text-green-500' };
+    return { mood: '🌿', text: 'Счастливо!', color: 'text-green-500' };
   };
 
   const upcomingActions = useMemo(() => {

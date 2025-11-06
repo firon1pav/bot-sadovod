@@ -58,7 +58,11 @@ export interface CareEvent {
 export interface Stats {
   userId: string;
   totalWaterings: number;
+  totalFertilizes: number;
+  totalRepots: number;
+  totalTrims: number;
   streakWater: number;
+  totalActions: number;
 }
 
 export interface LevelProgress {
@@ -95,4 +99,21 @@ export interface UserAchievement {
     userId: string;
     achievementId: string;
     earnedAt: Date;
+}
+
+export interface Friend {
+    id: string;
+    name: string;
+    photoUrl: string;
+}
+
+export interface User {
+    id: string;
+    name: string;
+    photoUrl: string;
+    gender: 'male' | 'female';
+    age: number;
+    telegramUsername?: string;
+    about: string;
+    friends: Friend[];
 }
