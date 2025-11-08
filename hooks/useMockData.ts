@@ -1,411 +1,364 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
-  Plant,
-  CareEvent,
-  CareType,
-  Stats,
-  LevelInfo,
-  Achievement,
-  UserAchievement,
-  PlantLocation,
-  PlantType,
-  AchievementRarity,
-  User,
-  Friend,
-  Community,
+  Plant, User, Stats, LevelInfo, Achievement, Community, CommunityPost, Comment, CareEvent,
+  CareType, PlantLocation, PlantType, AchievementRarity, Friend, Notification
 } from '../types';
-import { CARE_XP_REWARDS, DEFAULT_WATERING_FREQUENCY, XP_LEVELS } from '../constants';
+import { XP_LEVELS, CARE_XP_REWARDS, DEFAULT_WATERING_FREQUENCY } from '../constants';
+import { UserPlusIcon, StarIcon, TrophyIcon } from '../components/icons';
 
-// Simple uuid v4 mock, as we can't add new dependencies.
-function uuidv4() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+// --- HELPERS ---
+const uuid = () => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+const daysFromNow = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
-// --- MOCK DATA ---
+// --- MOCK DATA (defined outside the hook to prevent re-creation) ---
 
-const allUsers: User[] = [
+const MOCK_FRIENDS_DATA: Friend[] = [
+    { id: 'friend1', name: 'Елена', photoUrl: 'https://i.pravatar.cc/150?u=friend1' },
+    { id: 'friend2', name: 'Михаил', photoUrl: 'https://i.pravatar.cc/150?u=friend2' },
+    { id: 'friend3', name: 'Ольга', photoUrl: 'https://i.pravatar.cc/150?u=friend3' },
+    { id: 'friend4', name: 'Дмитрий', photoUrl: 'https://i.pravatar.cc/150?u=friend4' },
+];
+
+const ALL_MOCK_USERS: User[] = [
     {
         id: 'user1',
         name: 'Анна',
         photoUrl: 'https://i.pravatar.cc/150?u=user1',
         gender: 'female',
         age: 28,
-        telegramUsername: '@anna_grows',
-        about: 'Люблю комнатные растения и уют. В моей коллекции уже больше 15 разных видов! Ищу единомышленников для обмена опытом.',
-        friends: []
+        telegramUsername: 'anna_plantlover',
+        about: 'Обожаю комнатные растения! Моя коллекция постоянно растет. Рада поделиться советами и научиться новому.',
+        friends: MOCK_FRIENDS_DATA,
     },
-    { id: 'friend1', name: 'Иван', photoUrl: 'https://i.pravatar.cc/150?u=friend1', gender: 'male', age: 30, telegramUsername: '@ivan_k', about: 'Frontend разработчик и любитель кактусов.', friends: [] },
-    { id: 'friend2', name: 'Мария', photoUrl: 'https://i.pravatar.cc/150?u=friend2', gender: 'female', age: 25, telegramUsername: '@maria_s', about: 'Обожаю цветущие растения!', friends: [] },
-    { id: 'friend3', name: 'Петр', photoUrl: 'https://i.pravatar.cc/150?u=friend3', gender: 'male', age: 35, telegramUsername: '@petr_garden', about: 'Выращиваю овощи на балконе.', friends: [] },
-    { id: 'friend4', name: 'Елена', photoUrl: 'https://i.pravatar.cc/150?u=friend4', gender: 'female', age: 29, telegramUsername: '@elena_ficus', about: 'Коллекционирую фикусы.', friends: [] },
-    { id: 'friend5', name: 'Ольга', photoUrl: 'https://i.pravatar.cc/150?u=friend5', gender: 'female', age: 32, telegramUsername: '@olga_rose', about: 'Моя страсть - розы.', friends: [] },
-    { id: 'friend6', name: 'Дмитрий', photoUrl: 'https://i.pravatar.cc/150?u=friend6', gender: 'male', age: 27, telegramUsername: '@dima_green', about: 'Просто люблю зелень в доме.', friends: [] },
-    { id: 'user7', name: 'Сергей', photoUrl: 'https://i.pravatar.cc/150?u=user7', gender: 'male', age: 32, telegramUsername: '@sergey_dev', about: 'Backend developer, начинающий садовод.', friends: [] },
-    { id: 'user8', name: 'Катя', photoUrl: 'https://i.pravatar.cc/150?u=user8', gender: 'female', age: 29, telegramUsername: '@katy_art', about: 'Дизайнер, ищу вдохновение в растениях.', friends: [] },
-];
-
-
-const initialUser: User = {
-  ...allUsers[0],
-  friends: [
-    { id: 'friend1', name: 'Иван', photoUrl: 'https://i.pravatar.cc/150?u=friend1' },
-    { id: 'friend2', name: 'Мария', photoUrl: 'https://i.pravatar.cc/150?u=friend2' },
-    { id: 'friend3', name: 'Петр', photoUrl: 'https://i.pravatar.cc/150?u=friend3' },
-    { id: 'friend4', name: 'Елена', photoUrl: 'https://i.pravatar.cc/150?u=friend4' },
-    { id: 'friend5', name: 'Ольга', photoUrl: 'https://i.pravatar.cc/150?u=friend5' },
-    { id: 'friend6', name: 'Дмитрий', photoUrl: 'https://i.pravatar.cc/150?u=friend6' },
-  ]
-};
-
-const initialPlants: Plant[] = [
-  {
-    id: 'plant1',
-    userId: 'user1',
-    name: 'Монстера',
-    photoUrl: 'https://images.unsplash.com/photo-1591696205602-2f950c417cb9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=60',
-    location: PlantLocation.HOME,
-    type: PlantType.FOLIAGE,
-    lastWateredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    createdAt: new Date(),
-    wateringFrequencyDays: 5,
-    lastFertilizedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-    nextFertilizingDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: 'plant2',
-    userId: 'user1',
-    name: 'Фикус',
-    photoUrl: 'https://images.unsplash.com/photo-1614594975525-e4d524c4d697?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=60',
-    location: PlantLocation.OFFICE,
-    type: PlantType.FOLIAGE,
-    lastWateredAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
-    createdAt: new Date(),
-    wateringFrequencyDays: 7,
-  },
-  {
-    id: 'plant3',
-    userId: 'user1',
-    name: 'Суккулент',
-    photoUrl: 'https://images.unsplash.com/photo-1509423350716-97f9360b4e2c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=60',
-    location: PlantLocation.HOME,
-    type: PlantType.SUCCULENT,
-    lastWateredAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-    createdAt: new Date(),
-    wateringFrequencyDays: 14,
-    nextRepottingDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-  },
-];
-
-const initialCareEvents: CareEvent[] = [
-  {
-    id: 'event1',
-    userId: 'user1',
-    plantId: 'plant1',
-    type: CareType.WATER,
-    occurredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    createdAt: new Date(),
-  },
-];
-
-const initialStats: Stats = {
-  userId: 'user1',
-  totalWaterings: 12,
-  totalFertilizes: 5,
-  totalRepots: 2,
-  totalTrims: 8,
-  streakWater: 3,
-  totalActions: 27,
-};
-
-const allAchievements: Achievement[] = [
-    // Existing
-    { id: 'ach1', code: 'FIRST_PLANT', name: 'Начинающий садовод', description: 'Добавить первое растение', icon: '🌱', rarity: AchievementRarity.COMMON },
-    { id: 'ach2', code: 'FIVE_PLANTS', name: 'Коллекционер', description: 'Вырастить 5 растений', icon: '🪴', rarity: AchievementRarity.RARE },
-    { id: 'ach3', code: 'FIRST_WATER', name: 'Первая капля', description: 'Полить растение в первый раз', icon: '💧', rarity: AchievementRarity.COMMON },
-    { id: 'ach4', code: 'STREAK_7', name: 'Точность', description: 'Серия поливов в 7 дней', icon: '🎯', rarity: AchievementRarity.EPIC },
-    // New
-    { id: 'ach5', code: 'TEN_PLANTS', name: 'Садовод-любитель', description: 'Вырастить 10 растений', icon: '🌳', rarity: AchievementRarity.RARE },
-    { id: 'ach6', code: 'TWENTY_PLANTS', name: 'Ботанический эксперт', description: 'Собрать коллекцию из 20 растений', icon: '🏞️', rarity: AchievementRarity.EPIC },
-    { id: 'ach7', code: 'DIVERSE_GARDEN', name: 'Специалист по видам', description: 'Иметь хотя бы по одному растению каждого типа', icon: '🧬', rarity: AchievementRarity.RARE },
-    { id: 'ach8', code: 'STREAK_14', name: 'Мастер рутины', description: 'Серия поливов в 14 дней', icon: '🗓️', rarity: AchievementRarity.RARE },
-    { id: 'ach9', code: 'STREAK_30', name: 'Хранитель традиций', description: 'Серия поливов в 30 дней', icon: '🏛️', rarity: AchievementRarity.EPIC },
-    { id: 'ach10', code: 'WATER_50', name: 'Гидратор', description: 'Полить растения 50 раз', icon: '💦', rarity: AchievementRarity.COMMON },
-    { id: 'ach11', code: 'WATER_100', name: 'Повелитель дождя', description: 'Полить растения 100 раз', icon: '🌧️', rarity: AchievementRarity.RARE },
-    { id: 'ach12', code: 'LEVEL_5', name: 'Опытный цветовод', description: 'Достигнуть 5-го уровня', icon: '🌸', rarity: AchievementRarity.COMMON },
-    { id: 'ach13', code: 'LEVEL_10', name: 'Мастер-садовод', description: 'Достигнуть 10-го уровня', icon: '👑', rarity: AchievementRarity.EPIC },
-    { id: 'ach14', code: 'FIRST_FERTILIZE', name: 'Алхимик', description: 'Удобрить растение в первый раз', icon: '🧪', rarity: AchievementRarity.COMMON },
-    { id: 'ach15', code: 'FIRST_REPOT', name: 'Новый дом', description: 'Пересадить растение в первый раз', icon: '🏡', rarity: AchievementRarity.COMMON },
-    { id: 'ach16', code: 'FIRST_TRIM', name: 'Стилист', description: 'Обрезать растение в первый раз', icon: '✂️', rarity: AchievementRarity.COMMON },
-    { id: 'ach17', code: 'ALL_CARE_PLANT', name: 'Полный уход', description: 'Выполнить все виды ухода за одним растением', icon: '✅', rarity: AchievementRarity.EPIC },
-    { id: 'ach18', code: 'NIGHT_OWL', name: 'Ночной дозор', description: 'Ухаживать за растением ночью (с 22:00 до 6:00)', icon: '🦉', rarity: AchievementRarity.RARE },
-    { id: 'ach19', code: 'PERFECT_SCHEDULER', name: 'Планировщик', description: 'Установить расписание для всех видов ухода для растения', icon: '📋', rarity: AchievementRarity.RARE },
-];
-
-
-const initialUserAchievements: UserAchievement[] = [
-    { id: 'uach1', userId: 'user1', achievementId: 'ach1', earnedAt: new Date() },
-    { id: 'uach2', userId: 'user1', achievementId: 'ach3', earnedAt: new Date() },
-];
-
-const initialCommunities: Community[] = [
-    { id: 'comm1', name: 'Любители суккулентов', description: 'Все о кактусах и суккулентах. Делимся фото и советами по уходу.', photoUrl: 'https://images.unsplash.com/photo-1519336428358-708b9b5f0e31?w=200&h=200&fit=crop', memberCount: 1245, isMember: true },
-    { id: 'comm2', name: 'Орхидеи для всех', description: 'Помощь новичкам и обсуждения для опытных владельцев орхидей.', photoUrl: 'https://images.unsplash.com/photo-1557080922-3c348148a127?w=200&h=200&fit=crop', memberCount: 876, isMember: false },
-    { id: 'comm3', name: 'Городские джунгли', description: 'Превращаем квартиры в зеленые оазисы. Идеи, лайфхаки, вдохновение.', photoUrl: 'https://images.unsplash.com/photo-1614594975525-e4d524c4d697?w=200&h=200&fit=crop', memberCount: 2310, isMember: true },
-    { id: 'comm4', name: 'Балконное садоводство', description: 'Выращиваем овощи, травы и цветы на балконах и лоджиях.', photoUrl: 'https://images.unsplash.com/photo-1588122093712-c158397a69b4?w=200&h=200&fit=crop', memberCount: 654, isMember: false },
-    { id: 'comm5', name: 'Редкие и экзотические', description: 'Коллекционеры редких видов растений. Обмен и продажа.', photoUrl: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=200&h=200&fit=crop', memberCount: 432, isMember: false },
-];
-
-export default function useMockData() {
-  const [user, setUser] = useState<User>(initialUser);
-  const [plants, setPlants] = useState<Plant[]>(initialPlants);
-  const [careEvents, setCareEvents] = useState<CareEvent[]>(initialCareEvents);
-  const [stats, setStats] = useState<Stats>(initialStats);
-  const [xp, setXp] = useState(250); // initial XP
-  const [userAchievements, setUserAchievements] = useState<UserAchievement[]>(initialUserAchievements);
-  const [communities, setCommunities] = useState<Community[]>(initialCommunities);
-  
-  const achievementsMap = useMemo(() => new Map(allAchievements.map(a => [a.code, a])), []);
-
-  const awardAchievement = useCallback((code: string) => {
-    const achievement = achievementsMap.get(code);
-    if (!achievement) return;
-
-    const isAlreadyEarned = userAchievements.some(ua => ua.achievementId === achievement.id);
-    if (!isAlreadyEarned) {
-      setUserAchievements(prev => [...prev, {
-        id: uuidv4(),
-        userId: user.id,
-        achievementId: achievement.id,
-        earnedAt: new Date(),
-      }]);
+    // FIX: Explicitly typed the return value of the .map() callback as `User` to prevent TypeScript from widening the `gender` property to `string`, which caused a type mismatch with the `User[]` type annotation for `ALL_MOCK_USERS`.
+    ...MOCK_FRIENDS_DATA.map((f, i): User => ({
+        id: f.id,
+        name: f.name,
+        photoUrl: f.photoUrl,
+        gender: i % 2 === 0 ? 'female' : 'male',
+        age: 25 + i * 2,
+        telegramUsername: `${f.name.toLowerCase()}_${i}`,
+        about: 'Люблю природу и садоводство.',
+        friends: [],
+    })),
+     {
+        id: 'user_not_friend',
+        name: 'Сергей',
+        photoUrl: 'https://i.pravatar.cc/150?u=user_not_friend',
+        gender: 'male',
+        age: 32,
+        telegramUsername: 'sergey_green_thumb',
+        about: 'Профессиональный садовник.',
+        friends: [],
+    },
+    {
+        id: 'user_dmitry_3',
+        name: 'Дмитрий_3',
+        photoUrl: 'https://i.pravatar.cc/150?u=dmitry_3',
+        gender: 'male',
+        age: 29,
+        telegramUsername: 'дмитрий_3',
+        about: 'Ищу новых друзей для обмена опытом в садоводстве.',
+        friends: [],
     }
-  }, [achievementsMap, user.id, userAchievements]);
+];
 
-  const addPlant = useCallback((newPlantData: Omit<Plant, 'id' | 'createdAt'>) => {
-    const newPlant: Plant = {
-      ...newPlantData,
-      id: uuidv4(),
-      createdAt: new Date(),
-      wateringFrequencyDays: DEFAULT_WATERING_FREQUENCY[newPlantData.type] || DEFAULT_WATERING_FREQUENCY[PlantType.OTHER],
+const MOCK_PLANTS_DATA: Plant[] = [
+  {
+    id: 'plant1', userId: 'user1', name: 'Монстера Делициоза',
+    photoUrl: 'https://images.unsplash.com/photo-1614594975525-e45190c55d0b?q=80&w=600&h=600&fit=crop',
+    location: PlantLocation.HOME, type: PlantType.FOLIAGE,
+    lastWateredAt: daysAgo(3), createdAt: daysAgo(50), wateringFrequencyDays: 7,
+    lastFertilizedAt: daysAgo(20), nextFertilizingDate: daysFromNow(10),
+  },
+  {
+    id: 'plant2', userId: 'user1', name: 'Фикус Эластика',
+    photoUrl: 'https://images.unsplash.com/photo-1633519421873-a59483842821?q=80&w=600&h=600&fit=crop',
+    location: PlantLocation.OFFICE, type: PlantType.FOLIAGE,
+    lastWateredAt: daysAgo(6), createdAt: daysAgo(120), wateringFrequencyDays: 10,
+    lastRepottedAt: daysAgo(100), nextRepottingDate: daysFromNow(265),
+  },
+  {
+    id: 'plant3', userId: 'user1', name: 'Замиокулькас',
+    photoUrl: 'https://images.unsplash.com/photo-1617101882895-c0f5233c8275?q=80&w=600&h=600&fit=crop',
+    location: PlantLocation.HOME, type: PlantType.SUCCULENT,
+    lastWateredAt: daysAgo(12), createdAt: daysAgo(80), wateringFrequencyDays: 14,
+  },
+  {
+    id: 'plant4', userId: 'user1', name: 'Спатифиллум',
+    photoUrl: 'https://images.unsplash.com/photo-1599421498212-9c484d8b5a83?q=80&w=600&h=600&fit=crop',
+    location: PlantLocation.BALCONY, type: PlantType.FLOWERING,
+    lastWateredAt: daysAgo(1), createdAt: daysAgo(200), wateringFrequencyDays: 4,
+    lastTrimmedAt: daysAgo(30), nextTrimmingDate: daysFromNow(60),
+  },
+  {
+    id: 'plant_friend1', userId: 'friend1', name: 'Крассула',
+    photoUrl: 'https://images.unsplash.com/photo-1608625559132-09991201533b?q=80&w=600&h=600&fit=crop',
+    location: PlantLocation.HOME, type: PlantType.SUCCULENT,
+    lastWateredAt: daysAgo(10), createdAt: daysAgo(300), wateringFrequencyDays: 15,
+  },
+];
+
+
+const MOCK_CARE_EVENTS_DATA: CareEvent[] = [
+    { id: uuid(), userId: 'user1', plantId: 'plant1', type: CareType.WATER, occurredAt: daysAgo(3), createdAt: daysAgo(3) },
+    { id: uuid(), userId: 'user1', plantId: 'plant2', type: CareType.WATER, occurredAt: daysAgo(6), createdAt: daysAgo(6) },
+    { id: uuid(), userId: 'user1', plantId: 'plant3', type: CareType.WATER, occurredAt: daysAgo(12), createdAt: daysAgo(12) },
+    { id: uuid(), userId: 'user1', plantId: 'plant4', type: CareType.WATER, occurredAt: daysAgo(1), createdAt: daysAgo(1) },
+    { id: uuid(), userId: 'user1', plantId: 'plant1', type: CareType.FERTILIZE, occurredAt: daysAgo(20), createdAt: daysAgo(20) },
+    { id: uuid(), userId: 'user1', plantId: 'plant2', type: CareType.REPOT, occurredAt: daysAgo(100), createdAt: daysAgo(100) },
+    { id: uuid(), userId: 'user1', plantId: 'plant4', type: CareType.TRIM, occurredAt: daysAgo(30), createdAt: daysAgo(30), note: "Удалила старые листья" },
+];
+
+
+const MOCK_ACHIEVEMENTS_DATA: Achievement[] = [
+  { id: 'ach1', code: 'FIRST_WATER', name: 'Первая капля', description: 'Полейте свое первое растение.', icon: '💧', rarity: AchievementRarity.COMMON },
+  { id: 'ach2', code: 'FIRST_PLANT', name: 'Новый друг', description: 'Добавьте свое первое растение.', icon: '🌱', rarity: AchievementRarity.COMMON },
+  { id: 'ach3', code: 'FIRST_COMMUNITY', name: 'Общительный садовод', description: 'Вступите в свое первое сообщество.', icon: '🗣️', rarity: AchievementRarity.COMMON },
+  { id: 'ach4', code: 'FIRST_FERTILIZE', name: 'Первая подкормка', description: 'Удобрите растение в первый раз.', icon: '🧪', rarity: AchievementRarity.COMMON },
+  { id: 'ach5', code: 'FIRST_REPOT', name: 'Новый дом', description: 'Пересадите растение в первый раз.', icon: '🏠', rarity: AchievementRarity.RARE },
+  { id: 'ach6', code: 'FIRST_TRIM', name: 'Легкая рука', description: 'Обрежьте растение в первый раз.', icon: '✂️', rarity: AchievementRarity.RARE },
+  { id: 'ach7', code: 'FIVE_PLANTS', name: 'Маленькая роща', description: 'Вырастите 5 растений.', icon: '🌳', rarity: AchievementRarity.RARE },
+  { id: 'ach8', code: 'TEN_PLANTS', name: 'Городские джунгли', description: 'Вырастите 10 растений.', icon: '🏙️', rarity: AchievementRarity.EPIC },
+  { id: 'ach9', code: 'WATERING_MASTER', name: 'Мастер полива', description: 'Совершите 25 поливов.', icon: '🌊', rarity: AchievementRarity.RARE },
+  { id: 'ach10', code: 'FIRST_FRIEND', name: 'Рука дружбы', description: 'Добавьте первого друга.', icon: '🤝', rarity: AchievementRarity.COMMON },
+  { id: 'ach11', code: 'COMMUNITY_FOUNDER', name: 'Основатель', description: 'Создайте свое первое сообщество.', icon: '👑', rarity: AchievementRarity.EPIC },
+];
+
+const MOCK_COMMUNITIES_DATA: Community[] = [
+  {
+    id: 'community1', name: 'Клуб любителей суккулентов',
+    description: 'Все о суккулентах и кактусах. Делимся фотографиями, советами по уходу и размножению.',
+    photoUrl: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=800&h=400&fit=crop',
+    memberCount: 1234, isMember: true,
+  },
+  {
+    id: 'community2', name: 'Орхидеи: магия и уход',
+    description: 'Сообщество для всех, кто влюблен в орхидеи. От новичков до профессионалов.',
+    photoUrl: 'https://images.unsplash.com/photo-1558501202-b25076e7399a?q=80&w=800&h=400&fit=crop',
+    memberCount: 876, isMember: false,
+  },
+   {
+    id: 'community3', name: 'Городские джунгли',
+    description: 'Превращаем квартиры в зеленые оазисы. Идеи, лайфхаки и вдохновение.',
+    photoUrl: 'https://images.unsplash.com/photo-1592150621744-aca64f48394a?q=80&w=800&h=400&fit=crop',
+    memberCount: 2500, isMember: true,
+  },
+];
+
+const MOCK_POSTS_DATA: CommunityPost[] = [
+    {
+        id: 'post1', communityId: 'community1', authorId: 'friend1', authorName: 'Елена', authorPhotoUrl: 'https://i.pravatar.cc/150?u=friend1',
+        text: 'Посмотрите, как подросла моя эхеверия за лето! 😍',
+        photoUrl: 'https://images.unsplash.com/photo-1509423350616-3652d8523b49?q=80&w=600&h=600&fit=crop',
+        createdAt: daysAgo(1), likes: 25, comments: 1,
+    },
+    {
+        id: 'post2', communityId: 'community1', authorId: 'user1', authorName: 'Анна', authorPhotoUrl: 'https://i.pravatar.cc/150?u=user1',
+        text: 'Нужен совет! На листьях кактуса появились желтые пятна. Что это может быть?',
+        createdAt: daysAgo(2), likes: 10, comments: 2,
+    },
+];
+
+const MOCK_COMMENTS_DATA: Comment[] = [
+    { id: uuid(), postId: 'post1', authorId: 'user1', authorName: 'Анна', authorPhotoUrl: 'https://i.pravatar.cc/150?u=user1', text: 'Какая красота! ✨', createdAt: daysAgo(1) },
+    { id: uuid(), postId: 'post2', authorId: 'friend2', authorName: 'Михаил', authorPhotoUrl: 'https://i.pravatar.cc/150?u=friend2', text: 'Похоже на солнечный ожог. Не стоял на прямом солнце?', createdAt: daysAgo(2) },
+    { id: uuid(), postId: 'post2', authorId: 'user1', authorName: 'Анна', authorPhotoUrl: 'https://i.pravatar.cc/150?u=user1', text: 'Да, как раз переставила на южное окно. Спасибо, уберу!', createdAt: daysAgo(1) },
+];
+
+
+export const useMockData = () => {
+  const [user, setUser] = useState<User>(ALL_MOCK_USERS[0]);
+  const [plants, setPlants] = useState<Plant[]>(MOCK_PLANTS_DATA);
+  const [careEvents, setCareEvents] = useState<CareEvent[]>(MOCK_CARE_EVENTS_DATA);
+  const [achievements, setAchievements] = useState<(Achievement & { earnedAt?: Date })[]>(MOCK_ACHIEVEMENTS_DATA);
+  const [communities, setCommunities] = useState<Community[]>(MOCK_COMMUNITIES_DATA);
+  const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>(MOCK_POSTS_DATA);
+  const [comments, setComments] = useState<Comment[]>(MOCK_COMMENTS_DATA);
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set(['post1']));
+  const [pendingNotifications, setPendingNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPendingNotifications([
+        {
+          id: uuid(),
+          message: 'Дмитрий_3 хочет добавить вас в друзья.',
+          // FIX: In a .ts file, JSX syntax is not supported by default. Replaced the JSX syntax for UserPlusIcon with React.createElement to correctly create the icon element and resolve compilation errors.
+          icon: React.createElement(UserPlusIcon, { className: "w-5 h-5 text-purple-400" }),
+        },
+      ]);
+    }, 3000); // Show after 3 seconds
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Master achievement checker effect
+  useEffect(() => {
+    const newlyUnlocked: { code: string; name: string }[] = [];
+
+    const check = (code: string, condition: boolean) => {
+        const ach = achievements.find(a => a.code === code);
+        if (ach && !ach.earnedAt && condition) {
+            newlyUnlocked.push({ code, name: ach.name });
+        }
     };
     
-    setPlants(prev => {
-        const newPlants = [...prev, newPlant];
-        
-        // Plant count achievements
-        awardAchievement('FIRST_PLANT');
-        if (newPlants.length >= 5) awardAchievement('FIVE_PLANTS');
-        if (newPlants.length >= 10) awardAchievement('TEN_PLANTS');
-        if (newPlants.length >= 20) awardAchievement('TWENTY_PLANTS');
-        
-        // Diverse garden achievement
-        const plantTypes = new Set(newPlants.map(p => p.type));
-        if (plantTypes.has(PlantType.FOLIAGE) && plantTypes.has(PlantType.FLOWERING) && plantTypes.has(PlantType.SUCCULENT) && plantTypes.has(PlantType.PALM)) {
-            awardAchievement('DIVERSE_GARDEN');
+    // Calculate stats
+    const waterings = careEvents.filter(e => e.userId === user.id && e.type === CareType.WATER).length;
+    const fertilizes = careEvents.filter(e => e.userId === user.id && e.type === CareType.FERTILIZE).length;
+    const repots = careEvents.filter(e => e.userId === user.id && e.type === CareType.REPOT).length;
+    const trims = careEvents.filter(e => e.userId === user.id && e.type === CareType.TRIM).length;
+    const userPlants = plants.filter(p => p.userId === user.id);
+    const userIsMember = communities.some(c => c.isMember);
+    
+    // Check all achievements based on state
+    check('FIRST_WATER', waterings > 0);
+    check('WATERING_MASTER', waterings >= 25);
+    check('FIRST_FERTILIZE', fertilizes > 0);
+    check('FIRST_REPOT', repots > 0);
+    check('FIRST_TRIM', trims > 0);
+    check('FIRST_PLANT', userPlants.length > 0);
+    check('FIVE_PLANTS', userPlants.length >= 5);
+    check('TEN_PLANTS', userPlants.length >= 10);
+    check('FIRST_COMMUNITY', userIsMember);
+    check('FIRST_FRIEND', user.friends.length > 0);
+
+    if (newlyUnlocked.length > 0) {
+        setAchievements(prev => prev.map(a => {
+            const isUnlocked = newlyUnlocked.some(u => u.code === a.code);
+            if (isUnlocked && !a.earnedAt) {
+                return { ...a, earnedAt: new Date() };
+            }
+            return a;
+        }));
+
+        setPendingNotifications(prev => [
+            ...prev,
+            ...newlyUnlocked.map(ach => ({
+                id: uuid(),
+                message: `Достижение получено: ${ach.name}!`,
+                icon: React.createElement(TrophyIcon, { className: "w-5 h-5 text-yellow-400" })
+            }))
+        ]);
+    }
+
+  }, [plants, careEvents, communities, user, achievements]);
+
+  const stats = useMemo<Stats>(() => {
+    const totalWaterings = careEvents.filter(e => e.type === CareType.WATER).length;
+    const totalFertilizes = careEvents.filter(e => e.type === CareType.FERTILIZE).length;
+    const totalRepots = careEvents.filter(e => e.type === CareType.REPOT).length;
+    const totalTrims = careEvents.filter(e => e.type === CareType.TRIM).length;
+    return {
+      userId: 'user1',
+      totalWaterings,
+      totalFertilizes,
+      totalRepots,
+      totalTrims,
+      streakWater: 10, // Mocked for now
+      totalActions: totalWaterings + totalFertilizes + totalRepots + totalTrims,
+    };
+  }, [careEvents]);
+
+  const levelInfo = useMemo<LevelInfo>(() => {
+    const xp = (stats.totalActions * 5) + (stats.totalWaterings * CARE_XP_REWARDS.WATER) +
+               (stats.totalFertilizes * CARE_XP_REWARDS.FERTILIZE) +
+               (stats.totalRepots * CARE_XP_REWARDS.REPOT) +
+               (stats.totalTrims * CARE_XP_REWARDS.TRIM);
+
+    let currentLevelInfo = XP_LEVELS[0];
+    let nextLevelInfo = XP_LEVELS[1];
+    for (let i = 0; i < XP_LEVELS.length; i++) {
+        if (xp >= XP_LEVELS[i].minXp) {
+            currentLevelInfo = XP_LEVELS[i];
+            nextLevelInfo = XP_LEVELS[i + 1] || null;
+        } else {
+            break;
         }
-        
-        return newPlants;
-    });
-  }, [awardAchievement]);
+    }
+
+    const nextLevelXp = nextLevelInfo ? nextLevelInfo.minXp : currentLevelInfo.minXp;
+    const currentLevelMinXp = currentLevelInfo.minXp;
+    const progressInLevel = xp - currentLevelMinXp;
+    const xpForNextLevel = nextLevelXp - currentLevelMinXp;
+    const progressPercentage = xpForNextLevel > 0 ? Math.min((progressInLevel / xpForNextLevel) * 100, 100) : 100;
+
+    return {
+      userId: 'user1',
+      xp,
+      level: currentLevelInfo.level,
+      levelName: currentLevelInfo.name,
+      levelIcon: currentLevelInfo.icon,
+      nextLevelXp,
+      progressPercentage,
+    };
+  }, [stats]);
+  
+  const addPlant = useCallback((newPlantData: Omit<Plant, 'id' | 'createdAt'>) => {
+    const newPlant: Plant = {
+        ...newPlantData,
+        id: uuid(),
+        createdAt: new Date(),
+        wateringFrequencyDays: DEFAULT_WATERING_FREQUENCY[newPlantData.type] || 7,
+    };
+    setPlants(prev => [...prev, newPlant]);
+  }, []);
 
   const updatePlant = useCallback((plantId: string, updatedData: Partial<Omit<Plant, 'id'>>) => {
-    setPlants(prev => prev.map(p => {
-        if (p.id === plantId) {
-            const updatedPlant = { ...p, ...updatedData };
-            
-            // Perfect Scheduler achievement
-            if (
-                updatedPlant.wateringFrequencyDays &&
-                updatedPlant.nextFertilizingDate &&
-                updatedPlant.nextRepottingDate &&
-                updatedPlant.nextTrimmingDate
-            ) {
-                awardAchievement('PERFECT_SCHEDULER');
-            }
-            
-            return updatedPlant;
-        }
-        return p;
-    }));
-  }, [awardAchievement]);
+    setPlants(prev => prev.map(p => p.id === plantId ? { ...p, ...updatedData } : p));
+  }, []);
 
   const deletePlant = useCallback((plantId: string) => {
     setPlants(prev => prev.filter(p => p.id !== plantId));
+    setCareEvents(prev => prev.filter(e => e.plantId !== plantId));
   }, []);
 
-  const logCare = useCallback((plantId: string, careType: CareType) => {
-    const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-    // Check for a recent event of the same type for this plant
-    const recentEvent = careEvents.find(
-      event =>
+  const logCareEvent = useCallback((plantId: string, careType: CareType) => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    const lastEventToday = careEvents.find(event => 
         event.plantId === plantId &&
         event.type === careType &&
-        new Date(event.occurredAt) > twentyFourHoursAgo
+        new Date(event.occurredAt).toISOString().split('T')[0] === today
     );
-    
-    // Only award XP if no recent event is found
-    if (!recentEvent) {
-      const xpGained = CARE_XP_REWARDS[careType] || 0;
-      setXp(prev => prev + xpGained);
+
+    if (lastEventToday) {
+        setPendingNotifications(prev => [...prev, {
+            id: uuid(),
+            message: 'Опыт за это действие сегодня уже получен.',
+            icon: React.createElement(StarIcon, { className: "w-5 h-5 text-yellow-400" }),
+        }]);
+        return;
     }
-    
+
     const newEvent: CareEvent = {
-      id: uuidv4(),
-      userId: user.id,
-      plantId,
-      type: careType,
-      occurredAt: now,
-      createdAt: now,
+        id: uuid(),
+        userId: 'user1',
+        plantId,
+        type: careType,
+        occurredAt: new Date(),
+        createdAt: new Date(),
     };
-    
-    const allEvents = [newEvent, ...careEvents];
-    setCareEvents(allEvents);
+    setCareEvents(prev => [newEvent, ...prev]);
 
-    // Update plant last cared for dates
     setPlants(prev => prev.map(p => {
-      if (p.id === plantId) {
-        const updates: Partial<Plant> = {};
-        switch(careType) {
-          case CareType.WATER: updates.lastWateredAt = new Date(); break;
-          case CareType.FERTILIZE: updates.lastFertilizedAt = new Date(); updates.nextFertilizingDate = undefined; break;
-          case CareType.REPOT: updates.lastRepottedAt = new Date(); updates.nextRepottingDate = undefined; break;
-          case CareType.TRIM: updates.lastTrimmedAt = new Date(); updates.nextTrimmingDate = undefined; break;
+        if (p.id === plantId) {
+            const updates: Partial<Plant> = {};
+            if (careType === CareType.WATER) updates.lastWateredAt = new Date();
+            if (careType === CareType.FERTILIZE) updates.lastFertilizedAt = new Date();
+            if (careType === CareType.REPOT) updates.lastRepottedAt = new Date();
+            if (careType === CareType.TRIM) updates.lastTrimmedAt = new Date();
+            return { ...p, ...updates };
         }
-        return { ...p, ...updates };
-      }
-      return p;
+        return p;
     }));
-    
-    // First time care achievements
-    if(careType === CareType.WATER) awardAchievement('FIRST_WATER');
-    if(careType === CareType.FERTILIZE) awardAchievement('FIRST_FERTILIZE');
-    if(careType === CareType.REPOT) awardAchievement('FIRST_REPOT');
-    if(careType === CareType.TRIM) awardAchievement('FIRST_TRIM');
+  }, [careEvents]);
 
-    // Stats and streak achievements
-    setStats(prev => {
-        const newStats: Stats = {
-            ...prev,
-            totalActions: prev.totalActions + 1,
-        };
-
-        switch (careType) {
-            case CareType.WATER: {
-                const newTotalWaterings = prev.totalWaterings + 1;
-                const newStreak = prev.streakWater + 1;
-                
-                if (newTotalWaterings >= 50) awardAchievement('WATER_50');
-                if (newTotalWaterings >= 100) awardAchievement('WATER_100');
-                
-                if (newStreak >= 7) awardAchievement('STREAK_7');
-                if (newStreak >= 14) awardAchievement('STREAK_14');
-                if (newStreak >= 30) awardAchievement('STREAK_30');
-                
-                newStats.totalWaterings = newTotalWaterings;
-                newStats.streakWater = newStreak;
-                break;
-            }
-            case CareType.FERTILIZE:
-                newStats.totalFertilizes = (prev.totalFertilizes || 0) + 1;
-                break;
-            case CareType.REPOT:
-                newStats.totalRepots = (prev.totalRepots || 0) + 1;
-                break;
-            case CareType.TRIM:
-                newStats.totalTrims = (prev.totalTrims || 0) + 1;
-                break;
-        }
-
-        return newStats;
-    });
-    
-    // All care for one plant achievement
-    const careTypesForPlant = new Set(allEvents.filter(e => e.plantId === plantId).map(e => e.type));
-    if(careTypesForPlant.size === 4) {
-        awardAchievement('ALL_CARE_PLANT');
-    }
-    
-    // Night Owl achievement
-    const currentHour = new Date().getHours();
-    if (currentHour >= 22 || currentHour < 6) {
-        awardAchievement('NIGHT_OWL');
-    }
-
-  }, [user.id, careEvents, awardAchievement]);
-  
-  const levelInfo = useMemo<LevelInfo>(() => {
-    const currentLevelData = [...XP_LEVELS].reverse().find(l => xp >= l.minXp) || XP_LEVELS[0];
-    const nextLevelData = XP_LEVELS.find(l => l.level === currentLevelData.level + 1);
-
-    const levelXp = xp - currentLevelData.minXp;
-    const nextLevelXpTotal = nextLevelData ? nextLevelData.minXp - currentLevelData.minXp : levelXp;
-    const progressPercentage = nextLevelData ? (levelXp / nextLevelXpTotal) * 100 : 100;
-    
-    return {
-      userId: user.id,
-      xp,
-      level: currentLevelData.level,
-      levelName: currentLevelData.name,
-      levelIcon: currentLevelData.icon,
-      nextLevelXp: nextLevelData ? nextLevelData.minXp : xp,
-      progressPercentage: Math.min(100, progressPercentage),
-    };
-  }, [xp, user.id]);
-  
-  // Level-based achievements
-  useEffect(() => {
-      if (levelInfo.level >= 5) awardAchievement('LEVEL_5');
-      if (levelInfo.level >= 10) awardAchievement('LEVEL_10');
-  }, [levelInfo.level, awardAchievement]);
-
-  const achievements = useMemo(() => {
-    return allAchievements.map(ach => {
-      const userAch = userAchievements.find(ua => ua.achievementId === ach.id);
-      return {
-        ...ach,
-        earnedAt: userAch?.earnedAt,
-      };
-    });
-  }, [userAchievements]);
-  
   const updateUser = useCallback((updatedData: User) => {
-    setUser(updatedData);
+      setUser(updatedData);
   }, []);
-  
-  const searchUserByTelegram = useCallback((username: string): User | null => {
-    if (!username.trim()) return null;
-    const formattedUsername = username.startsWith('@') ? username : `@${username}`;
-    
-    const foundUser = allUsers.find(
-        u => u.telegramUsername?.toLowerCase() === formattedUsername.toLowerCase() && u.id !== user.id
-    );
-    
-    return foundUser || null;
-  }, [user.id]);
-
-  const addFriend = useCallback((friendToAdd: User) => {
-    const isAlreadyFriend = user.friends.some(f => f.id === friendToAdd.id);
-    if (isAlreadyFriend || friendToAdd.id === user.id) {
-        return; // Do nothing if already a friend or trying to add self
-    }
-
-    const newFriend: Friend = {
-        id: friendToAdd.id,
-        name: friendToAdd.name,
-        photoUrl: friendToAdd.photoUrl,
-    };
-
-    setUser(currentUser => ({
-        ...currentUser,
-        friends: [...currentUser.friends, newFriend],
-    }));
-  }, [user.id, user.friends]);
 
   const joinCommunity = useCallback((communityId: string) => {
     setCommunities(prev => prev.map(c => c.id === communityId ? { ...c, isMember: true, memberCount: c.memberCount + 1 } : c));
@@ -415,23 +368,114 @@ export default function useMockData() {
     setCommunities(prev => prev.map(c => c.id === communityId ? { ...c, isMember: false, memberCount: c.memberCount - 1 } : c));
   }, []);
 
+  const createCommunity = useCallback((communityData: Omit<Community, 'id' | 'memberCount' | 'isMember'>) => {
+    const newCommunity: Community = {
+        ...communityData,
+        id: uuid(),
+        memberCount: 1,
+        isMember: true,
+    };
+    setCommunities(prev => [newCommunity, ...prev]);
 
+    const founderAch = achievements.find(a => a.code === 'COMMUNITY_FOUNDER');
+    if (founderAch && !founderAch.earnedAt) {
+        setAchievements(prev => prev.map(a => a.code === 'COMMUNITY_FOUNDER' ? { ...a, earnedAt: new Date() } : a));
+        setPendingNotifications(prev => [...prev, {
+            id: uuid(),
+            message: `Достижение получено: ${founderAch.name}!`,
+            icon: React.createElement(TrophyIcon, { className: "w-5 h-5 text-yellow-400" })
+        }]);
+    }
+  }, [achievements]);
+
+  const addPost = useCallback((communityId: string, data: { text: string; photoUrl?: string }) => {
+    const newPost: CommunityPost = {
+        id: uuid(),
+        communityId,
+        authorId: user.id,
+        authorName: user.name,
+        authorPhotoUrl: user.photoUrl,
+        text: data.text,
+        photoUrl: data.photoUrl,
+        createdAt: new Date(),
+        likes: 0,
+        comments: 0,
+    };
+    setCommunityPosts(prev => [newPost, ...prev]);
+  }, [user]);
+
+  const updatePost = useCallback((postId: string, data: { text: string; photoUrl?: string }) => {
+    setCommunityPosts(prev => prev.map(p => p.id === postId ? { ...p, ...data } : p));
+  }, []);
+
+  const deletePost = useCallback((postId: string) => {
+    setCommunityPosts(prev => prev.filter(p => p.id !== postId));
+    setComments(prev => prev.filter(c => c.postId !== postId));
+  }, []);
+
+  const addComment = useCallback((postId: string, text: string) => {
+    const newComment: Comment = {
+        id: uuid(),
+        postId,
+        authorId: user.id,
+        authorName: user.name,
+        authorPhotoUrl: user.photoUrl,
+        text,
+        createdAt: new Date(),
+    };
+    setComments(prev => [...prev, newComment]);
+    setCommunityPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: p.comments + 1 } : p));
+  }, [user]);
+
+  const toggleLikePost = useCallback((postId: string) => {
+    setLikedPostIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(postId)) {
+            newSet.delete(postId);
+            setCommunityPosts(posts => posts.map(p => p.id === postId ? {...p, likes: p.likes - 1} : p));
+        } else {
+            newSet.add(postId);
+            setCommunityPosts(posts => posts.map(p => p.id === postId ? {...p, likes: p.likes + 1} : p));
+        }
+        return newSet;
+    });
+  }, []);
+
+  const searchUserByTelegram = useCallback((username: string): User | null => {
+    const found = ALL_MOCK_USERS.find(u => u.telegramUsername?.toLowerCase() === username.toLowerCase().trim() && u.id !== user.id);
+    return found || null;
+  }, [user.id]);
+
+  const addFriend = useCallback((userToAdd: User) => {
+    if (!user.friends.some(f => f.id === userToAdd.id)) {
+        const newFriend: Friend = { id: userToAdd.id, name: userToAdd.name, photoUrl: userToAdd.photoUrl };
+        setUser(prev => ({
+            ...prev,
+            friends: [...prev.friends, newFriend],
+        }));
+    }
+  }, [user.friends]);
+
+  const removeFriend = useCallback((friendId: string) => {
+    setUser(prev => ({
+        ...prev,
+        friends: prev.friends.filter(f => f.id !== friendId),
+    }));
+  }, []);
+
+  const getUserById = useCallback((userId: string): User | undefined => {
+    return ALL_MOCK_USERS.find(u => u.id === userId);
+  }, []);
+
+  const clearPendingNotifications = useCallback(() => {
+    setPendingNotifications([]);
+  }, []);
+  
   return {
-    user,
-    plants,
-    careEvents,
-    stats,
-    levelInfo,
-    achievements,
-    communities,
-    addPlant,
-    updatePlant,
-    deletePlant,
-    logCare,
-    updateUser,
-    searchUserByTelegram,
-    addFriend,
-    joinCommunity,
-    leaveCommunity,
+    plants, user, stats, levelInfo, achievements, communities, communityPosts, comments, careEvents,
+    likedPostIds, toggleLikePost, getUserById, pendingNotifications, clearPendingNotifications,
+    addPlant, updatePlant, deletePlant, logCareEvent, updateUser, joinCommunity, leaveCommunity,
+    createCommunity, addPost, updatePost, deletePost, addComment, searchUserByTelegram, addFriend,
+    removeFriend
   };
-}
+};

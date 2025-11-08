@@ -98,14 +98,17 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
     };
 
     const careActions = useMemo(() => [
-        { type: CareType.WATER, Icon: WaterDropIcon, label: 'Полить', lastActionDate: plant.lastWateredAt },
-        { type: CareType.FERTILIZE, Icon: FertilizerIcon, label: 'Удобрить', lastActionDate: plant.lastFertilizedAt },
-        { type: CareType.REPOT, Icon: SpadeIcon, label: 'Пересадить', lastActionDate: plant.lastRepottedAt },
-        { type: CareType.TRIM, Icon: ScissorsIcon, label: 'Обрезать', lastActionDate: plant.lastTrimmedAt },
-    ], [plant]);
+        { type: CareType.WATER, Icon: WaterDropIcon, label: 'Полить', color: 'blue' },
+        { type: CareType.FERTILIZE, Icon: FertilizerIcon, label: 'Удобрить', color: 'green' },
+        { type: CareType.REPOT, Icon: SpadeIcon, label: 'Пересадить', color: 'green' },
+        { type: CareType.TRIM, Icon: ScissorsIcon, label: 'Обрезать', color: 'green' },
+    ], []);
     
-    // FIX: Using `as const` allows TypeScript to infer the literal types for `key` and `type`,
-    // which enables type narrowing and fixes the error when calling `handleScheduleChange`.
+    const colorClasses = {
+        blue: { icon: 'text-blue-400', text: 'text-blue-400' },
+        green: { icon: 'text-green-400', text: 'text-green-400' },
+    };
+
     const scheduleItems = [
         { label: 'Полив', key: 'wateringFrequencyDays', type: 'number', placeholder: 'дней' },
         { label: 'Подкормка', key: 'nextFertilizingDate', type: 'date', placeholder: '' },
@@ -116,7 +119,7 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
     return (
         <div className="animate-fade-in">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between p-4">
                 <button onClick={onBack} className="p-2 rounded-full hover:bg-accent -ml-2">
                     <BackIcon className="w-6 h-6" />
                 </button>
@@ -126,99 +129,122 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
                 </button>
             </div>
             
-            {/* Photo */}
-            <div className="relative mb-6">
-                <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept="image/*" />
-                <img src={plant.photoUrl} alt={plant.name} className="w-full h-64 object-cover rounded-2xl" />
-                <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-3 right-3 bg-card/80 text-card-foreground p-2 rounded-full shadow-lg hover:bg-card flex items-center gap-2 text-sm px-3">
-                    <UploadIcon className="w-4 h-4" />
-                    Загрузить
-                </button>
-            </div>
-            
-            {/* Log Care Actions */}
-            <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-3">Журнал ухода</h2>
-                <div className="grid grid-cols-4 gap-2 text-center">
-                    {careActions.map(({ type, Icon, label }) => (
-                        <button key={type} onClick={() => onLogCareEvent(plant.id, type)} className="flex flex-col items-center justify-center h-full p-2 bg-card border border-accent rounded-lg hover:bg-accent transition-colors">
-                            <Icon className={`w-6 h-6 mb-1 ${type === CareType.WATER ? 'text-blue-500' : 'text-primary'}`} />
-                            <span className="text-xs">{label}</span>
-                        </button>
-                    ))}
+            <div className="px-4 pb-4">
+                {/* Photo */}
+                <div className="relative mb-6">
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept="image/*" />
+                    <img src={plant.photoUrl} alt={plant.name} className="w-full h-64 object-cover rounded-2xl" />
+                    <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-3 right-3 bg-card/80 text-card-foreground p-2 rounded-full shadow-lg hover:bg-card flex items-center gap-2 text-sm px-3">
+                        <UploadIcon className="w-4 h-4" />
+                        Загрузить
+                    </button>
                 </div>
-            </div>
-            
-            {/* Care Schedule */}
-            <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-3">Планирование ухода</h2>
-                <div className="space-y-3 bg-card border border-accent rounded-lg p-4">
-                     {scheduleItems.map(({ label, key, type, placeholder }) => (
-                        <div key={key} className="flex items-center justify-between">
-                            <label className="text-sm">{label}</label>
-                            {type === 'number' ? (
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        value={schedule[key] || ''}
-                                        onChange={e => handleScheduleChange(key, e.target.value)}
-                                        className="w-28 bg-accent border-none rounded-lg pl-3 pr-12 py-1.5 text-center focus:ring-2 focus:ring-primary"
-                                        placeholder="-"
-                                        min="1"
-                                    />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-foreground/50">{placeholder}</span>
-                                 </div>
-                            ) : (
-                                <div className="relative w-36">
-                                    <div className={`flex items-center justify-between w-full bg-accent border-transparent rounded-lg px-3 py-1.5 text-center cursor-pointer text-sm ${!schedule[key] && 'text-foreground/50'}`}>
-                                        <span>{formatDateForDisplay(schedule[key])}</span>
-                                        <CalendarIcon className="w-4 h-4 text-foreground/60" />
-                                    </div>
-                                    <input
-                                        type="date"
-                                        value={schedule[key] || ''}
-                                        onChange={e => handleScheduleChange(key, e.target.value)}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                    {isScheduleDirty && (
-                        <div className="flex justify-end pt-2">
-                            <button
-                                onClick={handleSaveSchedule}
-                                className="px-4 py-1.5 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors"
+                
+                {/* Log Care Actions */}
+                <div className="mb-6">
+                    <h2 className="text-lg font-semibold mb-3">Журнал ухода</h2>
+                    <div className="grid grid-cols-4 gap-3 text-center">
+                        {careActions.map(({ type, Icon, label, color }) => (
+                            <button 
+                                key={type} 
+                                onClick={() => onLogCareEvent(plant.id, type)} 
+                                className="flex flex-col items-center justify-center h-full p-3 bg-accent rounded-xl hover:bg-accent/70 transition-colors"
                             >
-                                Сохранить
+                                <Icon className={`w-7 h-7 mb-2 ${colorClasses[color as keyof typeof colorClasses].icon}`} />
+                                <span className={`text-sm font-semibold ${colorClasses[color as keyof typeof colorClasses].text}`}>{label}</span>
                             </button>
-                        </div>
-                    )}
+                        ))}
+                    </div>
                 </div>
-            </div>
-            
-            {/* Last Care Dates */}
-            <div className="mb-6">
-                 <h2 className="text-lg font-semibold mb-3">Последний уход</h2>
-                 <div className="space-y-2">
-                     {careActions.filter(a => a.lastActionDate).map(({type, label, lastActionDate}) => (
-                         <div key={type} className="flex justify-between text-sm p-3 bg-card rounded-lg border border-accent">
-                             <span>{label}</span>
-                             <span className="font-medium">{new Date(lastActionDate!).toLocaleDateString('ru-RU')}</span>
-                         </div>
-                     ))}
-                 </div>
-            </div>
+                
+                {/* Care Schedule */}
+                <div className="mb-6">
+                    <h2 className="text-lg font-semibold mb-3">Планирование ухода</h2>
+                    <div className="space-y-3 bg-card border border-accent rounded-lg p-4">
+                         {scheduleItems.map(({ label, key, type, placeholder }) => (
+                            <div key={key} className="flex items-center justify-between">
+                                <label className="text-sm">{label}</label>
+                                {type === 'number' ? (
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            value={schedule[key] || ''}
+                                            onChange={e => handleScheduleChange(key, e.target.value)}
+                                            className="w-28 bg-accent border-none rounded-lg pl-3 pr-12 py-1.5 text-center focus:ring-2 focus:ring-primary"
+                                            placeholder="-"
+                                            min="1"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-foreground/50">{placeholder}</span>
+                                     </div>
+                                ) : (
+                                    <div className="relative w-36">
+                                        <div className={`flex items-center justify-between w-full bg-accent border-transparent rounded-lg px-3 py-1.5 text-center cursor-pointer text-sm ${!schedule[key] && 'text-foreground/50'}`}>
+                                            <span>{formatDateForDisplay(schedule[key])}</span>
+                                            <CalendarIcon className="w-4 h-4 text-foreground/60" />
+                                        </div>
+                                        <input
+                                            type="date"
+                                            value={schedule[key] || ''}
+                                            onChange={e => handleScheduleChange(key, e.target.value)}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        {isScheduleDirty && (
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    onClick={handleSaveSchedule}
+                                    className="px-4 py-1.5 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors"
+                                >
+                                    Сохранить
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                
+                {/* Last Care Dates */}
+                <div className="mb-6">
+                     <h2 className="text-lg font-semibold mb-3">Последний уход</h2>
+                     <div className="space-y-2">
+                         {careActions.filter(a => {
+                            switch(a.type) {
+                                case CareType.WATER: return plant.lastWateredAt;
+                                case CareType.FERTILIZE: return plant.lastFertilizedAt;
+                                case CareType.REPOT: return plant.lastRepottedAt;
+                                case CareType.TRIM: return plant.lastTrimmedAt;
+                                default: return false;
+                            }
+                         }).map(({type, label}) => {
+                             let lastActionDate;
+                             switch(type) {
+                                case CareType.WATER: lastActionDate = plant.lastWateredAt; break;
+                                case CareType.FERTILIZE: lastActionDate = plant.lastFertilizedAt; break;
+                                case CareType.REPOT: lastActionDate = plant.lastRepottedAt; break;
+                                case CareType.TRIM: lastActionDate = plant.lastTrimmedAt; break;
+                             }
+                             return (
+                                 <div key={type} className="flex justify-between text-sm p-3 bg-card rounded-lg border border-accent">
+                                     <span>{label}</span>
+                                     <span className="font-medium">{new Date(lastActionDate!).toLocaleDateString('ru-RU')}</span>
+                                 </div>
+                             )
+                         })}
+                     </div>
+                </div>
 
-            {/* Delete Button Section */}
-            <div className="mt-8 border-t border-red-500/20 pt-6">
-                <button
-                    onClick={() => setIsDeleteConfirmOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 text-center px-4 py-2.5 bg-red-500/10 text-red-500 rounded-lg font-semibold hover:bg-red-500/20 transition-colors"
-                >
-                    <TrashIcon className="w-5 h-5" />
-                    Выкорчевать
-                </button>
+                {/* Delete Button Section */}
+                <div className="mt-8 border-t border-red-500/20 pt-6">
+                    <button
+                        onClick={() => setIsDeleteConfirmOpen(true)}
+                        className="w-full flex items-center justify-center gap-2 text-center px-4 py-2.5 bg-red-500/10 text-red-500 rounded-lg font-semibold hover:bg-red-500/20 transition-colors"
+                    >
+                        <TrashIcon className="w-5 h-5" />
+                        Выкорчевать
+                    </button>
+                </div>
             </div>
 
             {/* Edit Modal/Form */}

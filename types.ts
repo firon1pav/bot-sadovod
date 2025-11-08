@@ -1,3 +1,8 @@
+// FIX: Import React to use React.ReactNode type for Notification icon.
+import React from 'react';
+
+// FIX: Removed self-import of types from this file, which caused declaration conflicts.
+
 export enum PlantLocation {
   HOME = 'HOME',
   BALCONY = 'BALCONY',
@@ -125,4 +130,42 @@ export interface Community {
     photoUrl: string;
     memberCount: number;
     isMember: boolean;
+}
+
+export interface CommunityPost {
+    id: string;
+    communityId: string;
+    authorId: string;
+    authorName: string;
+    authorPhotoUrl: string;
+    text: string;
+    photoUrl?: string;
+    createdAt: Date;
+    likes: number;
+    comments: number;
+}
+
+export interface CommunityMember {
+    id: string;
+    communityId: string;
+    userId: string;
+    name: string;
+    photoUrl: string;
+    joinedAt: Date;
+}
+
+export interface Comment {
+    id: string;
+    postId: string;
+    authorId: string;
+    authorName: string;
+    authorPhotoUrl: string;
+    text: string;
+    createdAt: Date;
+}
+
+export interface Notification {
+  id: string;
+  message: string;
+  icon: React.ReactNode;
 }

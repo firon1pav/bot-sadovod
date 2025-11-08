@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Stats, LevelInfo, Achievement, Plant, User, Community } from '../types';
+import { Stats, LevelInfo, Achievement, Plant, User, Community, Friend } from '../types';
 import CommunitiesScreen from './CommunitiesScreen';
 import StatsScreen from './StatsScreen';
 import AchievementsScreen from './AchievementsScreen';
 import { 
-    AchievementIcon, StatsIcon, CakeIcon, UsersIcon, 
+    CakeIcon, 
     ProfileIcon as GenderIcon, GardenForkIcon, CloseIcon, SaveIcon, UploadIcon, AtSymbolIcon,
-    SearchIcon, MessageCircleIcon, UserPlusIcon
+    SearchIcon
 } from './icons';
 
 interface ProfileScreenProps {
@@ -18,14 +18,21 @@ interface ProfileScreenProps {
     communities: Community[];
     onJoinCommunity: (communityId: string) => void;
     onLeaveCommunity: (communityId: string) => void;
+    onCreateCommunity: (communityData: Omit<Community, 'id' | 'memberCount' | 'isMember'>) => void;
     onUpdateUser: (updatedData: User) => void;
     searchUserByTelegram: (username: string) => User | null;
     addFriend: (user: User) => void;
+    onSelectCommunity: (community: Community) => void;
+    onSelectFriend: (friendId: string) => void;
 }
 
 type ProfileTab = 'stats' | 'achievements' | 'communities';
 
-const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, achievements, plants, communities, onJoinCommunity, onLeaveCommunity, onUpdateUser, searchUserByTelegram, addFriend }) => {
+const ProfileScreen: React.FC<ProfileScreenProps> = ({ 
+    user, stats, levelInfo, achievements, plants, communities, 
+    onJoinCommunity, onLeaveCommunity, onCreateCommunity, onUpdateUser, 
+    searchUserByTelegram, addFriend, onSelectCommunity, onSelectFriend 
+}) => {
     const [activeTab, setActiveTab] = useState<ProfileTab>('stats');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editableUser, setEditableUser] = useState(user);
@@ -89,9 +96,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, a
 
     const renderTabs = () => (
         <div className="flex bg-card border border-accent rounded-full p-1 mb-6">
-            <button onClick={() => handleTabClick('stats')} className={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-semibold rounded-full justify-center transition-colors duration-300 ${activeTab === 'stats' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}> <StatsIcon className="w-4 h-4" /> Статистика</button>
-            <button onClick={() => handleTabClick('achievements')} className={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-semibold rounded-full justify-center transition-colors duration-300 ${activeTab === 'achievements' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}> <AchievementIcon className="w-4 h-4" /> Достижения</button>
-            <button onClick={() => handleTabClick('communities')} className={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-semibold rounded-full justify-center transition-colors duration-300 ${activeTab === 'communities' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}> <UsersIcon className="w-4 h-4" /> Сообщества</button>
+            <button onClick={() => handleTabClick('stats')} className={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-semibold rounded-full justify-center transition-colors duration-300 ${activeTab === 'stats' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}> 📊 Статистика</button>
+            <button onClick={() => handleTabClick('achievements')} className={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-semibold rounded-full justify-center transition-colors duration-300 ${activeTab === 'achievements' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}> 🏆 Достижения</button>
+            <button onClick={() => handleTabClick('communities')} className={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-semibold rounded-full justify-center transition-colors duration-300 ${activeTab === 'communities' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}> 👥 Сообщества</button>
         </div>
     );
     
@@ -134,7 +141,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, a
             <div className="mb-6">
                 <div className="flex justify-between items-center mb-3">
                      <h3 className="font-bold text-lg flex items-center gap-2">
-                        <UsersIcon className="w-5 h-5"/>
+                        <span>👥</span>
                         Друзья
                      </h3>
                      <button onClick={() => setIsSearching(!isSearching)} className="p-1 rounded-full hover:bg-accent">
@@ -160,20 +167,45 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, a
                         {searchResult === 'not_found' ? (
                             <p className="text-center text-foreground/70 p-3 bg-card border border-accent rounded-lg">Такого пользователя нет</p>
                         ) : (
-                            <div className="relative bg-card border border-accent rounded-lg p-3 flex items-center gap-3">
-                                <img src={searchResult.photoUrl} alt={searchResult.name} className="w-12 h-12 rounded-full object-cover cursor-pointer" onClick={() => setShowSearchResultActions(searchResult.id)} />
+                            <div className="relative bg-card border border-accent rounded-lg p-3 flex items-center gap-3 cursor-pointer" onClick={() => setShowSearchResultActions(searchResult.id)}>
+                                <img src={searchResult.photoUrl} alt={searchResult.name} className="w-12 h-12 rounded-full object-cover" />
                                 <div>
                                     <p className="font-bold">{searchResult.name}</p>
                                     <p className="text-sm text-foreground/70">{searchResult.telegramUsername}</p>
                                 </div>
         
                                 {showSearchResultActions === searchResult.id && (
-                                    <div className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center gap-3 animate-fade-in">
-                                        <button title="Написать сообщение" className="p-3 bg-accent rounded-full hover:bg-primary/50"><MessageCircleIcon className="w-5 h-5"/></button>
+                                    <div 
+                                        className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center gap-4 animate-fade-in"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <a
+                                          href={`https://t.me/${searchResult.telegramUsername}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          title="Написать сообщение"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="w-12 h-12 flex items-center justify-center bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors text-2xl"
+                                        >
+                                          💬
+                                        </a>
+
                                         {!isAlreadyFriend(searchResult.id) ? (
-                                             <button title="Добавить в друзья" onClick={() => handleAddFriend(searchResult)} className="p-3 bg-accent rounded-full hover:bg-primary/50"><UserPlusIcon className="w-5 h-5"/></button>
+                                             <button 
+                                                title="Добавить в друзья" 
+                                                onClick={(e) => { e.stopPropagation(); handleAddFriend(searchResult); }} 
+                                                className="w-12 h-12 flex items-center justify-center bg-accent rounded-full hover:bg-accent/80 transition-colors text-purple-400 font-bold text-3xl"
+                                             >
+                                                +
+                                             </button>
                                         ) : <p className="text-xs font-bold text-primary-foreground">Уже в друзьях</p>}
-                                        <button title="Отмена" onClick={() => setShowSearchResultActions(null)} className="p-2 bg-accent rounded-full hover:bg-red-500/50"><CloseIcon className="w-5 h-5"/></button>
+                                        <button 
+                                            title="Отмена" 
+                                            onClick={(e) => { e.stopPropagation(); setShowSearchResultActions(null); }} 
+                                            className="w-12 h-12 flex items-center justify-center bg-accent rounded-full hover:bg-accent/80 transition-colors text-red-500 font-bold text-2xl"
+                                        >
+                                            ×
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -186,10 +218,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, a
                     style={{ WebkitOverflowScrolling: 'touch' }}
                 >
                     {user.friends.map(friend => (
-                        <div key={friend.id} className="flex flex-col items-center flex-shrink-0 w-20 text-center">
-                            <img src={friend.photoUrl} alt={friend.name} className="w-16 h-16 rounded-full object-cover mb-1 border-2 border-accent" />
-                            <span className="text-xs truncate w-full">{friend.name}</span>
-                        </div>
+                        <button 
+                            key={friend.id} 
+                            onClick={() => onSelectFriend(friend.id)}
+                            className="flex flex-col items-center flex-shrink-0 w-20 text-center group"
+                        >
+                            <img src={friend.photoUrl} alt={friend.name} className="w-16 h-16 rounded-full object-cover mb-1 border-2 border-accent group-hover:border-primary transition-colors" />
+                            <span className="text-xs truncate w-full group-hover:text-primary transition-colors">{friend.name}</span>
+                        </button>
                     ))}
                 </div>
             </div>
@@ -199,7 +235,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, a
             <div>
                 {activeTab === 'stats' && <StatsScreen stats={stats} plants={plants} />}
                 {activeTab === 'achievements' && <AchievementsScreen achievements={achievements} />}
-                {activeTab === 'communities' && <CommunitiesScreen communities={communities} onJoin={onJoinCommunity} onLeave={onLeaveCommunity} />}
+                {activeTab === 'communities' && <CommunitiesScreen communities={communities} onJoin={onJoinCommunity} onLeave={onLeaveCommunity} onCreate={onCreateCommunity} onSelect={onSelectCommunity} />}
             </div>
 
             {isEditModalOpen && (
@@ -239,8 +275,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, stats, levelInfo, a
                                     </select>
                                 </div>
                                 <div className="w-1/2">
-                                    <label className="block text-sm font-medium text-foreground/80 mb-1">Возраст</label>
-                                    <input type="number" value={editableUser.age} onChange={(e) => setEditableUser({...editableUser, age: parseInt(e.target.value, 10) || 0})} className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
+                                    <label htmlFor="user-age" className="block text-sm font-medium text-foreground/80 mb-1">Возраст</label>
+                                    <input
+                                        id="user-age"
+                                        type="number"
+                                        value={editableUser.age}
+                                        onChange={(e) => setEditableUser({ ...editableUser, age: parseInt(e.target.value, 10) || 0 })}
+                                        className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"
+                                        min="0"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                    />
                                 </div>
                             </div>
                              <div>

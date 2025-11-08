@@ -7,6 +7,7 @@ interface PlantCardProps {
   plant: Plant;
   onLogCare: (plantId: string, careType: CareType) => void;
   onSelect: (plant: Plant) => void;
+  isReadOnly?: boolean;
 }
 
 const CARE_ACTION_DETAILS: Record<string, { Icon: React.FC<any>, name: string }> = {
@@ -16,7 +17,7 @@ const CARE_ACTION_DETAILS: Record<string, { Icon: React.FC<any>, name: string }>
     [CareType.TRIM]: { Icon: ScissorsIcon, name: 'Обрезка' },
 };
 
-const PlantCard: React.FC<PlantCardProps> = ({ plant, onLogCare, onSelect }) => {
+const PlantCard: React.FC<PlantCardProps> = ({ plant, onLogCare, onSelect, isReadOnly = false }) => {
   const daysSinceWatered = (new Date().getTime() - new Date(plant.lastWateredAt).getTime()) / (1000 * 3600 * 24);
   
   const getPlantStatus = () => {
@@ -61,8 +62,8 @@ const PlantCard: React.FC<PlantCardProps> = ({ plant, onLogCare, onSelect }) => 
 
   return (
     <div 
-      className="bg-card border border-accent rounded-2xl shadow-sm overflow-hidden flex flex-col transition-transform hover:scale-105 duration-300 cursor-pointer"
-      onClick={() => onSelect(plant)}
+      className={`bg-card border border-accent rounded-2xl shadow-sm overflow-hidden flex flex-col transition-transform duration-300 ${!isReadOnly ? 'cursor-pointer' : ''}`}
+      onClick={!isReadOnly ? () => onSelect(plant) : undefined}
     >
       <img src={plant.photoUrl} alt={plant.name} className="w-full h-32 object-cover" />
       <div className="p-3 flex flex-col flex-grow">
@@ -81,7 +82,7 @@ const PlantCard: React.FC<PlantCardProps> = ({ plant, onLogCare, onSelect }) => 
         </div>
         
         <div className="mt-auto pt-3">
-          {upcomingActions.length > 0 && (
+          {!isReadOnly && upcomingActions.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-foreground/60 mb-1">Требуется уход:</p>
               <div className="flex -mx-1">
