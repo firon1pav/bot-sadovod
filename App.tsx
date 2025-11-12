@@ -22,7 +22,7 @@ const App: React.FC = () => {
         likedPostIds, toggleLikePost, getUserById, pendingNotifications, clearPendingNotifications,
         addPlant, updatePlant, deletePlant, logCareEvent, updateUser, joinCommunity, leaveCommunity,
         createCommunity, addPost, updatePost, deletePost, addComment, searchUserByTelegram, addFriend,
-        removeFriend
+        removeFriend, pendingFriendRequests, handleFriendRequestAction
     } = useMockData();
 
     const [activeScreen, setActiveScreen] = useState('Сад');
@@ -238,6 +238,8 @@ const App: React.FC = () => {
                             addFriend={addFriend}
                             onSelectCommunity={handleSelectCommunity}
                             onSelectFriend={handleSelectFriend}
+                            pendingFriendRequests={pendingFriendRequests}
+                            onFriendRequestAction={handleFriendRequestAction}
                         />
                        </div>;
             case 'Сад':
@@ -251,7 +253,7 @@ const App: React.FC = () => {
                         </div>
                         <button 
                             onClick={() => setIsAddPlantModalOpen(true)} 
-                            className="fixed bottom-20 right-5 bg-primary text-primary-foreground rounded-full p-4 shadow-lg hover:bg-primary/90 transition-transform hover:scale-110"
+                            className="fixed bottom-20 right-5 bg-primary text-primary-foreground rounded-full p-4 shadow-lg hover:bg-primary/90 transition-transform hover:scale-110 z-20"
                             aria-label="Добавить растение"
                         >
                             <PlusIcon className="w-6 h-6" />

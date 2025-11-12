@@ -7,7 +7,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ levelInfo }) => {
   return (
-    <header className="bg-card/80 backdrop-blur-lg border-b border-accent p-4 sticky top-0 z-10">
+    <header className="bg-card/70 backdrop-blur-lg border-b border-accent p-4 sticky top-0 z-30">
       <div className="flex justify-center items-center gap-4">
         <div className="flex items-center gap-3">
           <span className="text-3xl">{levelInfo.levelIcon}</span>

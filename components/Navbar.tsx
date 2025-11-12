@@ -15,7 +15,7 @@ const navItems = [
 
 const Navbar: React.FC<NavbarProps> = ({ activeScreen, setActiveScreen, userPhotoUrl }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-card/80 backdrop-blur-lg border-t border-accent">
+    <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-card/70 backdrop-blur-lg border-t border-accent z-30">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
           const isActive = activeScreen === item.name;

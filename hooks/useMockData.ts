@@ -4,7 +4,11 @@ import {
   CareType, PlantLocation, PlantType, AchievementRarity, Friend, Notification
 } from '../types';
 import { XP_LEVELS, CARE_XP_REWARDS, DEFAULT_WATERING_FREQUENCY } from '../constants';
-import { UserPlusIcon, StarIcon, TrophyIcon } from '../components/icons';
+import {
+    StarIcon, TrophyIcon,
+    FirstWaterIcon, FirstPlantIcon, FirstCommunityIcon, FirstFertilizeIcon, FirstRepotIcon, FirstTrimIcon,
+    FivePlantsIcon, TenPlantsIcon, WateringMasterIcon, FirstFriendIcon, CommunityFounderIcon
+} from '../components/icons';
 
 // --- HELPERS ---
 const uuid = () => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -18,6 +22,14 @@ const MOCK_FRIENDS_DATA: Friend[] = [
     { id: 'friend2', name: 'Михаил', photoUrl: 'https://i.pravatar.cc/150?u=friend2' },
     { id: 'friend3', name: 'Ольга', photoUrl: 'https://i.pravatar.cc/150?u=friend3' },
     { id: 'friend4', name: 'Дмитрий', photoUrl: 'https://i.pravatar.cc/150?u=friend4' },
+    { id: 'friend5', name: 'Светлана', photoUrl: 'https://i.pravatar.cc/150?u=friend5' },
+    { id: 'friend6', name: 'Алексей', photoUrl: 'https://i.pravatar.cc/150?u=friend6' },
+    { id: 'friend7', name: 'Ирина', photoUrl: 'https://i.pravatar.cc/150?u=friend7' },
+    { id: 'friend8', name: 'Виктор', photoUrl: 'https://i.pravatar.cc/150?u=friend8' },
+    { id: 'friend9', name: 'Татьяна', photoUrl: 'https://i.pravatar.cc/150?u=friend9' },
+    { id: 'friend10', name: 'Андрей', photoUrl: 'https://i.pravatar.cc/150?u=friend10' },
+    { id: 'friend11', name: 'Наталья', photoUrl: 'https://i.pravatar.cc/150?u=friend11' },
+    { id: 'friend12', name: 'Сергей', photoUrl: 'https://i.pravatar.cc/150?u=friend12' },
 ];
 
 const ALL_MOCK_USERS: User[] = [
@@ -113,17 +125,17 @@ const MOCK_CARE_EVENTS_DATA: CareEvent[] = [
 
 
 const MOCK_ACHIEVEMENTS_DATA: Achievement[] = [
-  { id: 'ach1', code: 'FIRST_WATER', name: 'Первая капля', description: 'Полейте свое первое растение.', icon: '💧', rarity: AchievementRarity.COMMON },
-  { id: 'ach2', code: 'FIRST_PLANT', name: 'Новый друг', description: 'Добавьте свое первое растение.', icon: '🌱', rarity: AchievementRarity.COMMON },
-  { id: 'ach3', code: 'FIRST_COMMUNITY', name: 'Общительный садовод', description: 'Вступите в свое первое сообщество.', icon: '🗣️', rarity: AchievementRarity.COMMON },
-  { id: 'ach4', code: 'FIRST_FERTILIZE', name: 'Первая подкормка', description: 'Удобрите растение в первый раз.', icon: '🧪', rarity: AchievementRarity.COMMON },
-  { id: 'ach5', code: 'FIRST_REPOT', name: 'Новый дом', description: 'Пересадите растение в первый раз.', icon: '🏠', rarity: AchievementRarity.RARE },
-  { id: 'ach6', code: 'FIRST_TRIM', name: 'Легкая рука', description: 'Обрежьте растение в первый раз.', icon: '✂️', rarity: AchievementRarity.RARE },
-  { id: 'ach7', code: 'FIVE_PLANTS', name: 'Маленькая роща', description: 'Вырастите 5 растений.', icon: '🌳', rarity: AchievementRarity.RARE },
-  { id: 'ach8', code: 'TEN_PLANTS', name: 'Городские джунгли', description: 'Вырастите 10 растений.', icon: '🏙️', rarity: AchievementRarity.EPIC },
-  { id: 'ach9', code: 'WATERING_MASTER', name: 'Мастер полива', description: 'Совершите 25 поливов.', icon: '🌊', rarity: AchievementRarity.RARE },
-  { id: 'ach10', code: 'FIRST_FRIEND', name: 'Рука дружбы', description: 'Добавьте первого друга.', icon: '🤝', rarity: AchievementRarity.COMMON },
-  { id: 'ach11', code: 'COMMUNITY_FOUNDER', name: 'Основатель', description: 'Создайте свое первое сообщество.', icon: '👑', rarity: AchievementRarity.EPIC },
+  { id: 'ach1', code: 'FIRST_WATER', name: 'Первая капля', description: 'Полейте свое первое растение.', icon: React.createElement(FirstWaterIcon), rarity: AchievementRarity.COMMON },
+  { id: 'ach2', code: 'FIRST_PLANT', name: 'Новый друг', description: 'Добавьте свое первое растение.', icon: React.createElement(FirstPlantIcon), rarity: AchievementRarity.COMMON },
+  { id: 'ach3', code: 'FIRST_COMMUNITY', name: 'Общительный садовод', description: 'Вступите в свое первое сообщество.', icon: React.createElement(FirstCommunityIcon), rarity: AchievementRarity.COMMON },
+  { id: 'ach4', code: 'FIRST_FERTILIZE', name: 'Первая подкормка', description: 'Удобрите растение в первый раз.', icon: React.createElement(FirstFertilizeIcon), rarity: AchievementRarity.COMMON },
+  { id: 'ach5', code: 'FIRST_REPOT', name: 'Новый дом', description: 'Пересадите растение в первый раз.', icon: React.createElement(FirstRepotIcon), rarity: AchievementRarity.RARE },
+  { id: 'ach6', code: 'FIRST_TRIM', name: 'Легкая рука', description: 'Обрежьте растение в первый раз.', icon: React.createElement(FirstTrimIcon), rarity: AchievementRarity.RARE },
+  { id: 'ach7', code: 'FIVE_PLANTS', name: 'Маленькая роща', description: 'Вырастите 5 растений.', icon: React.createElement(FivePlantsIcon), rarity: AchievementRarity.RARE },
+  { id: 'ach8', code: 'TEN_PLANTS', name: 'Городские джунгли', description: 'Вырастите 10 растений.', icon: React.createElement(TenPlantsIcon), rarity: AchievementRarity.EPIC },
+  { id: 'ach9', code: 'WATERING_MASTER', name: 'Мастер полива', description: 'Совершите 25 поливов.', icon: React.createElement(WateringMasterIcon), rarity: AchievementRarity.RARE },
+  { id: 'ach10', code: 'FIRST_FRIEND', name: 'Рука дружбы', description: 'Добавьте первого друга.', icon: React.createElement(FirstFriendIcon), rarity: AchievementRarity.COMMON },
+  { id: 'ach11', code: 'COMMUNITY_FOUNDER', name: 'Основатель', description: 'Создайте свое первое сообщество.', icon: React.createElement(CommunityFounderIcon), rarity: AchievementRarity.EPIC },
 ];
 
 const MOCK_COMMUNITIES_DATA: Community[] = [
@@ -178,17 +190,14 @@ export const useMockData = () => {
   const [comments, setComments] = useState<Comment[]>(MOCK_COMMENTS_DATA);
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set(['post1']));
   const [pendingNotifications, setPendingNotifications] = useState<Notification[]>([]);
+  const [pendingFriendRequests, setPendingFriendRequests] = useState<User[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setPendingNotifications([
-        {
-          id: uuid(),
-          message: 'Дмитрий_3 хочет добавить вас в друзья.',
-          // FIX: In a .ts file, JSX syntax is not supported by default. Replaced the JSX syntax for UserPlusIcon with React.createElement to correctly create the icon element and resolve compilation errors.
-          icon: React.createElement(UserPlusIcon, { className: "w-5 h-5 text-purple-400" }),
-        },
-      ]);
+        const userToRequest = ALL_MOCK_USERS.find(u => u.telegramUsername === 'дмитрий_3');
+        if (userToRequest) {
+            setPendingFriendRequests([userToRequest]);
+        }
     }, 3000); // Show after 3 seconds
 
     return () => clearTimeout(timer);
@@ -456,6 +465,13 @@ export const useMockData = () => {
     }
   }, [user.friends]);
 
+  const handleFriendRequestAction = useCallback((requestingUser: User, accept: boolean) => {
+    if (accept) {
+      addFriend(requestingUser);
+    }
+    setPendingFriendRequests(prev => prev.filter(req => req.id !== requestingUser.id));
+  }, [addFriend]);
+
   const removeFriend = useCallback((friendId: string) => {
     setUser(prev => ({
         ...prev,
@@ -476,6 +492,6 @@ export const useMockData = () => {
     likedPostIds, toggleLikePost, getUserById, pendingNotifications, clearPendingNotifications,
     addPlant, updatePlant, deletePlant, logCareEvent, updateUser, joinCommunity, leaveCommunity,
     createCommunity, addPost, updatePost, deletePost, addComment, searchUserByTelegram, addFriend,
-    removeFriend
+    removeFriend, pendingFriendRequests, handleFriendRequestAction
   };
 };

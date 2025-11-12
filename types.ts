@@ -95,7 +95,7 @@ export interface Achievement {
     code: string;
     name: string;
     description: string;
-    icon: string;
+    icon: React.ReactNode;
     rarity: AchievementRarity;
 }
 

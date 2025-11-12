@@ -23,7 +23,7 @@ const AchievementsScreen: React.FC<AchievementsScreenProps> = ({ achievements })
                 {earnedAchievements.map(ach => (
                     <div key={ach.id} className={`bg-card border-l-4 ${RARITY_COLORS[ach.rarity].replace('text-', 'border-')} p-3 rounded-lg`}>
                         <div className="flex items-center gap-3">
-                            <span className="text-2xl">{ach.icon}</span>
+                            <div className="w-12 h-12 flex-shrink-0">{ach.icon}</div>
                             <div>
                                 <p className="font-bold">{ach.name}</p>
                                 <p className="text-xs text-foreground/70">{ach.description}</p>
@@ -37,7 +37,7 @@ const AchievementsScreen: React.FC<AchievementsScreenProps> = ({ achievements })
                 {unearnedAchievements.map(ach => (
                     <div key={ach.id} className={`bg-card border-l-4 ${RARITY_COLORS[ach.rarity].replace('text-', 'border-')} p-3 rounded-lg`}>
                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{ach.icon}</span>
+                            <div className="w-12 h-12 flex-shrink-0">{ach.icon}</div>
                             <div>
                                 <p className="font-bold">{ach.name}</p>
                                 <p className="text-xs text-foreground/70">{ach.description}</p>

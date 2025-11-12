@@ -6,7 +6,8 @@ import AchievementsScreen from './AchievementsScreen';
 import { 
     CakeIcon, 
     ProfileIcon as GenderIcon, GardenForkIcon, CloseIcon, SaveIcon, UploadIcon, AtSymbolIcon,
-    SearchIcon
+    SearchIcon,
+    CheckIcon
 } from './icons';
 
 interface ProfileScreenProps {
@@ -24,14 +25,23 @@ interface ProfileScreenProps {
     addFriend: (user: User) => void;
     onSelectCommunity: (community: Community) => void;
     onSelectFriend: (friendId: string) => void;
+    pendingFriendRequests: User[];
+    onFriendRequestAction: (requestingUser: User, accept: boolean) => void;
 }
 
 type ProfileTab = 'stats' | 'achievements' | 'communities';
 
+const TABS = [
+  { id: 'stats', label: 'Статистика', icon: '📊' },
+  { id: 'achievements', label: 'Достижения', icon: '🏆' },
+  { id: 'communities', label: 'Сообщества', icon: '👥' },
+];
+
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ 
     user, stats, levelInfo, achievements, plants, communities, 
     onJoinCommunity, onLeaveCommunity, onCreateCommunity, onUpdateUser, 
-    searchUserByTelegram, addFriend, onSelectCommunity, onSelectFriend 
+    searchUserByTelegram, addFriend, onSelectCommunity, onSelectFriend,
+    pendingFriendRequests, onFriendRequestAction
 }) => {
     const [activeTab, setActiveTab] = useState<ProfileTab>('stats');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -94,13 +104,39 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setActiveTab(tab);
     };
 
-    const renderTabs = () => (
-        <div className="flex bg-card border border-accent rounded-full p-1 mb-6">
-            <button onClick={() => handleTabClick('stats')} className={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-semibold rounded-full justify-center transition-colors duration-300 ${activeTab === 'stats' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}> 📊 Статистика</button>
-            <button onClick={() => handleTabClick('achievements')} className={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-semibold rounded-full justify-center transition-colors duration-300 ${activeTab === 'achievements' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}> 🏆 Достижения</button>
-            <button onClick={() => handleTabClick('communities')} className={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-semibold rounded-full justify-center transition-colors duration-300 ${activeTab === 'communities' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}> 👥 Сообщества</button>
-        </div>
-    );
+    const renderTabs = () => {
+        const activeIndex = TABS.findIndex(tab => tab.id === activeTab);
+        
+        return (
+            <div className="relative flex bg-card border border-accent rounded-full p-1 mb-6">
+                {/* Sliding Background */}
+                <div
+                    className="absolute top-1 bottom-1 bg-primary rounded-full transition-transform duration-300 ease-in-out"
+                    style={{
+                        width: `calc(100% / ${TABS.length})`,
+                        transform: `translateX(${activeIndex * 100}%)`
+                    }}
+                    aria-hidden="true"
+                />
+                
+                {TABS.map(({ id, label, icon }) => (
+                    <button 
+                        key={id}
+                        onClick={() => handleTabClick(id as ProfileTab)} 
+                        className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 px-1 py-2 text-sm font-semibold transition-colors duration-300 ${
+                            activeTab === id 
+                            ? 'text-primary-foreground' 
+                            : 'text-foreground/80 hover:text-foreground'
+                        }`}
+                        aria-pressed={activeTab === id}
+                    >
+                        <span className="text-lg">{icon}</span>
+                        <span>{label}</span>
+                    </button>
+                ))}
+            </div>
+        );
+    }
     
     return (
         <div className="animate-fade-in">
@@ -140,8 +176,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
             <div className="mb-6">
                 <div className="flex justify-between items-center mb-3">
-                     <h3 className="font-bold text-lg flex items-center gap-2">
-                        <span>👥</span>
+                     <h3 className="font-bold text-lg">
                         Друзья
                      </h3>
                      <button onClick={() => setIsSearching(!isSearching)} className="p-1 rounded-full hover:bg-accent">
@@ -212,6 +247,37 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         )}
                     </div>
                 )}
+                
+                {pendingFriendRequests.length > 0 && (
+                    <div className="mb-4 space-y-3 animate-fade-in">
+                        {pendingFriendRequests.map(request => (
+                            <div key={request.id} className="bg-card border border-primary/30 rounded-lg p-3">
+                                <div className="flex items-center gap-3">
+                                    <img src={request.photoUrl} alt={request.name} className="w-12 h-12 rounded-full object-cover" />
+                                    <p className="flex-grow text-sm">
+                                        <span className="font-bold">{request.name}</span> хочет добавить вас в друзья.
+                                    </p>
+                                </div>
+                                <div className="flex justify-end gap-2 mt-3">
+                                    <button 
+                                        onClick={() => onFriendRequestAction(request, false)}
+                                        className="px-4 py-1.5 bg-accent text-sm font-semibold rounded-full hover:bg-accent/70"
+                                    >
+                                        Отклонить
+                                    </button>
+                                    <button 
+                                        onClick={() => onFriendRequestAction(request, true)}
+                                        className="px-4 py-1.5 bg-primary text-primary-foreground text-sm font-semibold rounded-full hover:bg-primary/90 flex items-center gap-1.5"
+                                    >
+                                        <CheckIcon className="w-4 h-4" />
+                                        Принять
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
 
                 <div 
                     className="flex gap-3 overflow-x-auto pb-2 -mb-2 no-scrollbar overscroll-x-contain"

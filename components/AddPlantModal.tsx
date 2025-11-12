@@ -1,7 +1,8 @@
-import React, { useState, FormEvent, useEffect } from 'react';
+import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import { Plant, PlantLocation, PlantType } from '../types';
 import { PLANT_LOCATIONS_OPTIONS, PLANT_TYPES_OPTIONS } from '../constants';
 import { PLANT_LOCATION_RUSSIAN, PLANT_TYPE_RUSSIAN } from '../utils';
+import { UploadIcon } from './icons';
 
 interface AddPlantModalProps {
   isOpen: boolean;
@@ -16,6 +17,9 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
   const [type, setType] = useState<PlantType>(PlantType.FOLIAGE);
   const [customType, setCustomType] = useState('');
   const [lastWateredAt, setLastWateredAt] = useState(new Date().toISOString().split('T')[0]);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     if (!isOpen) {
@@ -25,15 +29,30 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
         setType(PlantType.FOLIAGE);
         setCustomType('');
         setLastWateredAt(new Date().toISOString().split('T')[0]);
+        setPhotoUrl(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     }
   }, [isOpen]);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const newPlant: Omit<Plant, 'id' | 'createdAt'> = {
       userId: 'user1',
       name,
-      photoUrl: `https://picsum.photos/seed/${name.replace(/\s/g, '')}/400/400`,
+      photoUrl: photoUrl || `https://picsum.photos/seed/${name.replace(/\s/g, '')}/400/400`,
       location,
       customLocation: location === PlantLocation.OTHER ? customLocation : undefined,
       type,
@@ -52,6 +71,23 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
         <h2 className="text-xl font-bold mb-4">Добавить новое растение</h2>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
+            <div className="flex flex-col items-center">
+                <input type="file" ref={fileInputRef} onChange={handlePhotoChange} style={{ display: 'none' }} accept="image/*" />
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="relative w-24 h-24 rounded-full bg-accent flex items-center justify-center text-foreground/50 hover:bg-accent/80 transition-colors"
+                >
+                    {photoUrl ? (
+                        <img src={photoUrl} alt="Превью" className="w-full h-full rounded-full object-cover"/>
+                    ) : (
+                        <div className="text-center">
+                           <UploadIcon className="w-8 h-8 mx-auto" />
+                           <span className="text-xs mt-1">Фото</span>
+                        </div>
+                    )}
+                </button>
+            </div>
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-foreground/80 mb-1">Название растения</label>
               <input type="text" id="name" value={name} onChange={(e) => setName(e.target.value)} required className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
