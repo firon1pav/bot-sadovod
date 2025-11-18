@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Notification } from '../types';
 import { CloseIcon } from './icons';
 
@@ -10,28 +10,32 @@ interface NotificationToastProps {
 const NotificationToast: React.FC<NotificationToastProps> = ({ notification, onDismiss }) => {
     const [isExiting, setIsExiting] = useState(false);
 
+    const handleDismiss = useCallback(() => {
+        setIsExiting(true);
+        // Wait for animation to finish before actually removing from state
+        setTimeout(() => {
+            onDismiss(notification.id);
+        }, 300); 
+    }, [notification.id, onDismiss]);
+
     useEffect(() => {
         const timer = setTimeout(() => {
             handleDismiss();
         }, 5000); // Auto-dismiss after 5 seconds
 
         return () => clearTimeout(timer);
-    }, []);
-
-    const handleDismiss = () => {
-        setIsExiting(true);
-        setTimeout(() => {
-            onDismiss(notification.id);
-        }, 300); // Match animation duration
-    };
+    }, [handleDismiss]);
 
     return (
         <div 
             className={`
-                bg-card border border-primary/50 rounded-lg shadow-lg p-3 flex items-start gap-3 transition-all duration-300 ease-out
-                ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}
+                bg-card border border-primary/50 rounded-lg shadow-lg p-3 flex items-start gap-3 
+                transition-all duration-300 ease-in-out
+                ${isExiting 
+                    ? 'opacity-0 translate-x-full pointer-events-none' 
+                    : 'opacity-100 translate-x-0 animate-slide-in-right'
+                }
             `}
-            style={{ animation: 'slide-in-right 0.3s ease-out' }}
         >
             <div className="flex-shrink-0 mt-0.5">{notification.icon}</div>
             <p className="flex-grow text-sm font-medium">{notification.message}</p>

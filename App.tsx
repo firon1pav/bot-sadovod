@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import Header from './components/Header';
 import Navbar from './components/Navbar';
 import PlantCard from './components/PlantCard';
@@ -10,13 +11,90 @@ import CommunityDetailScreen from './components/CommunityDetailScreen';
 import NotificationToast from './components/NotificationToast';
 import FriendProfileScreen from './components/FriendProfileScreen';
 
-
 import { useMockData } from './hooks/useMockData';
 import { Plant, Community, CareType, Notification, User } from './types';
 import { PlusIcon, WaterDropIcon, FertilizerIcon, SpadeIcon, ScissorsIcon } from './components/icons';
 import { CARE_TYPE_RUSSIAN } from './utils';
 
-const App: React.FC = () => {
+// --- Route Wrappers ---
+
+const PlantDetailRoute = ({ plants, onUpdatePlant, onLogCareEvent, onDeletePlant }: any) => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const plant = plants.find((p: Plant) => p.id === id);
+
+    if (!plant) return <Navigate to="/" replace />;
+
+    return (
+        <PlantDetailScreen
+            plant={plant}
+            onBack={() => navigate(-1)}
+            onUpdatePlant={onUpdatePlant}
+            onLogCareEvent={onLogCareEvent}
+            onDeletePlant={(plantId) => {
+                onDeletePlant(plantId);
+                navigate('/');
+            }}
+        />
+    );
+};
+
+const CommunityDetailRoute = ({ communities, communityPosts, comments, user, leaveCommunity, joinCommunity, addPost, updatePost, deletePost, addComment, likedPostIds, toggleLikePost, addNotification, timeAgo }: any) => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const community = communities.find((c: Community) => c.id === id);
+
+    if (!community) return <Navigate to="/profile" replace />;
+
+    return (
+        <CommunityDetailScreen
+            community={community}
+            posts={communityPosts.filter((p: any) => p.communityId === community.id)}
+            comments={comments}
+            currentUser={user}
+            onBack={() => navigate(-1)}
+            onLeaveCommunity={(cid) => {
+                 leaveCommunity(cid);
+                 navigate('/profile'); 
+            }}
+            onJoinCommunity={joinCommunity}
+            onAddPost={addPost}
+            onUpdatePost={updatePost}
+            onDeletePost={deletePost}
+            onAddComment={addComment}
+            likedPostIds={likedPostIds}
+            toggleLikePost={toggleLikePost}
+            addNotification={addNotification}
+            timeAgo={timeAgo}
+        />
+    );
+};
+
+const FriendProfileRoute = ({ getUserById, plants, levelInfo, removeFriend }: any) => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const friend = getUserById(id);
+
+    if (!friend) return <Navigate to="/profile" replace />;
+
+    return (
+        <FriendProfileScreen
+            friend={friend}
+            plants={plants.filter((p: Plant) => p.userId === friend.id)}
+            levelInfo={levelInfo}
+            onBack={() => navigate(-1)}
+            onRemoveFriend={(fid) => {
+                removeFriend(fid);
+                navigate('/profile');
+            }}
+        />
+    );
+};
+
+
+// --- Main App Content ---
+
+const AppContent: React.FC = () => {
     const {
         plants, user, stats, levelInfo, achievements, communities, communityPosts, comments, careEvents,
         likedPostIds, toggleLikePost, getUserById, pendingNotifications, clearPendingNotifications,
@@ -25,10 +103,7 @@ const App: React.FC = () => {
         removeFriend, pendingFriendRequests, handleFriendRequestAction
     } = useMockData();
 
-    const [activeScreen, setActiveScreen] = useState('Сад');
-    const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
-    const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
-    const [selectedFriend, setSelectedFriend] = useState<User | null>(null);
+    const navigate = useNavigate();
     const [isAddPlantModalOpen, setIsAddPlantModalOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [shownReminders, setShownReminders] = useState<Set<string>>(new Set());
@@ -103,51 +178,9 @@ const App: React.FC = () => {
         setNotifications(prev => prev.filter(n => n.id !== id));
     };
 
-    useEffect(() => {
-        if (selectedCommunity) {
-            const updatedCommunity = communities.find(c => c.id === selectedCommunity.id);
-            if (updatedCommunity) {
-                setSelectedCommunity(updatedCommunity);
-            } else {
-                setSelectedCommunity(null);
-            }
-        }
-    }, [communities, selectedCommunity]);
-
-    const handleSelectPlant = (plant: Plant) => {
-        setSelectedPlant(plant);
-    };
-
-    const handleSelectCommunity = (community: Community) => {
-        setSelectedCommunity(community);
-    };
-
-    const handleSelectFriend = (friendId: string) => {
-        const friendUser = getUserById(friendId);
-        if(friendUser) {
-            setSelectedFriend(friendUser);
-        }
-    };
-    
-    const handleBackFromDetail = () => {
-        setSelectedPlant(null);
-        setSelectedCommunity(null);
-        setSelectedFriend(null);
-    };
-
     const handleAddPlant = (newPlantData: Omit<Plant, 'id' | 'createdAt'>) => {
         addPlant(newPlantData);
         setIsAddPlantModalOpen(false);
-    };
-    
-    const handleDeletePlant = (plantId: string) => {
-        deletePlant(plantId);
-        setSelectedPlant(null);
-    }
-
-    const handleRemoveFriend = (friendId: string) => {
-        removeFriend(friendId);
-        setSelectedFriend(null);
     };
 
     const timeAgo = useCallback((date: Date): string => {
@@ -165,104 +198,6 @@ const App: React.FC = () => {
         return "только что";
     }, []);
 
-    const handleNavigate = (screen: string) => {
-        setSelectedPlant(null);
-        setSelectedCommunity(null);
-        setSelectedFriend(null);
-        setActiveScreen(screen);
-    };
-
-    const renderContent = () => {
-        if (selectedFriend) {
-            return (
-                <FriendProfileScreen
-                    friend={selectedFriend}
-                    plants={plants.filter(p => p.userId === selectedFriend.id)}
-                    levelInfo={levelInfo} // Note: In a real app, this would be the friend's level info
-                    onBack={handleBackFromDetail}
-                    onRemoveFriend={handleRemoveFriend}
-                />
-            )
-        }
-        if (selectedPlant) {
-            return (
-                <PlantDetailScreen
-                    plant={selectedPlant}
-                    onBack={handleBackFromDetail}
-                    onUpdatePlant={updatePlant}
-                    onLogCareEvent={logCareEvent}
-                    onDeletePlant={handleDeletePlant}
-                />
-            );
-        }
-
-        if (selectedCommunity) {
-            return (
-                <CommunityDetailScreen
-                    community={selectedCommunity}
-                    posts={communityPosts.filter(p => p.communityId === selectedCommunity.id)}
-                    comments={comments}
-                    currentUser={user}
-                    onBack={handleBackFromDetail}
-                    onLeaveCommunity={leaveCommunity}
-                    onJoinCommunity={joinCommunity}
-                    onAddPost={addPost}
-                    onUpdatePost={updatePost}
-                    onDeletePost={deletePost}
-                    onAddComment={addComment}
-                    likedPostIds={likedPostIds}
-                    toggleLikePost={toggleLikePost}
-                    addNotification={addNotification}
-                    timeAgo={timeAgo}
-                />
-            )
-        }
-
-        switch (activeScreen) {
-            case 'Календарь':
-                return <div className="p-4"><CalendarScreen plants={plants} /></div>;
-            case 'Профиль':
-                return <div className="p-4">
-                        <ProfileScreen
-                            user={user}
-                            stats={stats}
-                            levelInfo={levelInfo}
-                            achievements={achievements}
-                            plants={plants}
-                            communities={communities}
-                            onJoinCommunity={joinCommunity}
-                            onLeaveCommunity={leaveCommunity}
-                            onCreateCommunity={createCommunity}
-                            onUpdateUser={updateUser}
-                            searchUserByTelegram={searchUserByTelegram}
-                            addFriend={addFriend}
-                            onSelectCommunity={handleSelectCommunity}
-                            onSelectFriend={handleSelectFriend}
-                            pendingFriendRequests={pendingFriendRequests}
-                            onFriendRequestAction={handleFriendRequestAction}
-                        />
-                       </div>;
-            case 'Сад':
-            default:
-                return (
-                    <div className="p-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            {plants.map((plant) => (
-                                <PlantCard key={plant.id} plant={plant} onLogCare={(plantId, careType) => logCareEvent(plantId, careType)} onSelect={handleSelectPlant} />
-                            ))}
-                        </div>
-                        <button 
-                            onClick={() => setIsAddPlantModalOpen(true)} 
-                            className="fixed bottom-20 right-5 bg-primary text-primary-foreground rounded-full p-4 shadow-lg hover:bg-primary/90 transition-transform hover:scale-110 z-20"
-                            aria-label="Добавить растение"
-                        >
-                            <PlusIcon className="w-6 h-6" />
-                        </button>
-                    </div>
-                );
-        }
-    };
-
     return (
         <div className="bg-background text-foreground min-h-screen font-sans">
             <div className="fixed top-4 right-4 z-50 w-full max-w-sm space-y-2">
@@ -277,16 +212,104 @@ const App: React.FC = () => {
             <div className="max-w-lg mx-auto pb-20">
                 <Header levelInfo={levelInfo} />
                 <main>
-                    {renderContent()}
+                    <Routes>
+                        <Route path="/" element={
+                            <div className="p-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    {plants.map((plant) => (
+                                        <PlantCard 
+                                            key={plant.id} 
+                                            plant={plant} 
+                                            onLogCare={(plantId, careType) => logCareEvent(plantId, careType)} 
+                                            onSelect={(p) => navigate(`/plants/${p.id}`)} 
+                                        />
+                                    ))}
+                                </div>
+                                <button 
+                                    onClick={() => setIsAddPlantModalOpen(true)} 
+                                    className="fixed bottom-20 right-5 bg-primary text-primary-foreground rounded-full p-4 shadow-lg hover:bg-primary/90 transition-transform hover:scale-110 z-20"
+                                    aria-label="Добавить растение"
+                                >
+                                    <PlusIcon className="w-6 h-6" />
+                                </button>
+                            </div>
+                        } />
+                        <Route path="/calendar" element={<div className="p-4"><CalendarScreen plants={plants} /></div>} />
+                        <Route path="/profile" element={
+                            <div className="p-4">
+                                <ProfileScreen
+                                    user={user}
+                                    stats={stats}
+                                    levelInfo={levelInfo}
+                                    achievements={achievements}
+                                    plants={plants}
+                                    communities={communities}
+                                    onJoinCommunity={joinCommunity}
+                                    onLeaveCommunity={leaveCommunity}
+                                    onCreateCommunity={createCommunity}
+                                    onUpdateUser={updateUser}
+                                    searchUserByTelegram={searchUserByTelegram}
+                                    addFriend={addFriend}
+                                    onSelectCommunity={(c) => navigate(`/communities/${c.id}`)}
+                                    onSelectFriend={(fid) => navigate(`/friends/${fid}`)}
+                                    pendingFriendRequests={pendingFriendRequests}
+                                    onFriendRequestAction={handleFriendRequestAction}
+                                />
+                            </div>
+                        } />
+                        <Route path="/plants/:id" element={
+                            <PlantDetailRoute 
+                                plants={plants} 
+                                onUpdatePlant={updatePlant} 
+                                onLogCareEvent={logCareEvent} 
+                                onDeletePlant={deletePlant} 
+                            />
+                        } />
+                        <Route path="/communities/:id" element={
+                            <CommunityDetailRoute 
+                                communities={communities}
+                                communityPosts={communityPosts}
+                                comments={comments}
+                                user={user}
+                                leaveCommunity={leaveCommunity}
+                                joinCommunity={joinCommunity}
+                                addPost={addPost}
+                                updatePost={updatePost}
+                                deletePost={deletePost}
+                                addComment={addComment}
+                                likedPostIds={likedPostIds}
+                                toggleLikePost={toggleLikePost}
+                                addNotification={addNotification}
+                                timeAgo={timeAgo}
+                            />
+                        } />
+                        <Route path="/friends/:id" element={
+                            <FriendProfileRoute 
+                                getUserById={getUserById}
+                                plants={plants}
+                                levelInfo={levelInfo}
+                                removeFriend={removeFriend}
+                            />
+                        } />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
                 </main>
             </div>
-            <Navbar activeScreen={activeScreen} setActiveScreen={handleNavigate} userPhotoUrl={user.photoUrl} />
+            <Navbar userPhotoUrl={user.photoUrl} />
             <AddPlantModal
                 isOpen={isAddPlantModalOpen}
                 onClose={() => setIsAddPlantModalOpen(false)}
                 onAddPlant={handleAddPlant}
             />
         </div>
+    );
+};
+
+const App: React.FC = () => {
+    return (
+        <HashRouter>
+            <AppContent />
+        </HashRouter>
     );
 };
 
