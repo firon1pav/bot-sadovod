@@ -39,11 +39,34 @@
                   '0%': { transform: 'translateX(100%)', opacity: '0' },
                   '100%': { transform: 'translateX(0)', opacity: '1' },
               },
+              'rain': {
+                '0%': { transform: 'translateY(-10px)', opacity: '0' },
+                '30%': { opacity: '1' },
+                '100%': { transform: 'translateY(50px)', opacity: '0' },
+              },
+              'wiggle': {
+                '0%, 100%': { transform: 'rotate(-3deg)' },
+                '50%': { transform: 'rotate(3deg)' },
+              },
+              'pop': {
+                '0%': { transform: 'scale(1)' },
+                '50%': { transform: 'scale(1.1)' },
+                '100%': { transform: 'scale(1)' },
+              },
+              'sparkle': {
+                '0%': { transform: 'scale(0) rotate(0deg)', opacity: '0' },
+                '50%': { transform: 'scale(1) rotate(90deg)', opacity: '1' },
+                '100%': { transform: 'scale(0) rotate(180deg)', opacity: '0' },
+              }
             },
             animation: {
               'fade-in': 'fade-in 0.3s ease-out',
               'fade-in-up': 'fade-in-up 0.3s ease-out',
               'slide-in-right': 'slide-in-right 0.3s ease-out',
+              'rain': 'rain 0.8s linear infinite',
+              'wiggle': 'wiggle 0.2s ease-in-out infinite',
+              'pop': 'pop 0.3s ease-in-out',
+              'sparkle': 'sparkle 0.8s ease-in-out forwards',
             }
           }
         }
@@ -82,7 +105,9 @@
     "date-fns/": "https://aistudiocdn.com/date-fns@^4.1.0/",
     "date-fns": "https://aistudiocdn.com/date-fns@^4.1.0",
     "react-router-dom": "https://esm.sh/react-router-dom@6.22.0?external=react,react-dom",
-    "@remix-run/router": "https://esm.sh/@remix-run/router@1.15.0?external=react,react-dom"
+    "@remix-run/router": "https://esm.sh/@remix-run/router@1.15.0?external=react,react-dom",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "canvas-confetti": "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/+esm"
   }
 }
 </script>

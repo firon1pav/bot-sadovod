@@ -1,4 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+
+
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import Header from './components/Header';
 import Navbar from './components/Navbar';
@@ -10,10 +12,12 @@ import AddPlantModal from './components/AddPlantModal';
 import CommunityDetailScreen from './components/CommunityDetailScreen';
 import NotificationToast from './components/NotificationToast';
 import FriendProfileScreen from './components/FriendProfileScreen';
+// @ts-ignore
+import confetti from 'canvas-confetti';
 
 import { useMockData } from './hooks/useMockData';
 import { Plant, Community, CareType, Notification, User } from './types';
-import { PlusIcon, WaterDropIcon, FertilizerIcon, SpadeIcon, ScissorsIcon } from './components/icons';
+import { PlusIcon, WaterDropIcon, FertilizerIcon, SpadeIcon, ScissorsIcon, BellIcon } from './components/icons';
 import { CARE_TYPE_RUSSIAN } from './utils';
 
 // --- Route Wrappers ---
@@ -108,16 +112,49 @@ const AppContent: React.FC = () => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [shownReminders, setShownReminders] = useState<Set<string>>(new Set());
 
+    // Confetti logic
+    const prevLevelRef = useRef(levelInfo.level);
+    useEffect(() => {
+        if (levelInfo.level > prevLevelRef.current) {
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 },
+                zIndex: 100,
+                colors: ['#22C55E', '#3B82F6', '#FACC15', '#EC4899']
+            });
+            // You could also add a dedicated modal or toast here
+            addNotification({
+                message: `Новый уровень! Теперь вы ${levelInfo.levelName}`,
+                icon: <span className="text-xl">🎉</span>
+            });
+        }
+        prevLevelRef.current = levelInfo.level;
+    }, [levelInfo.level]);
+
     const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
         const newNotification = { ...notification, id: `${Date.now()}-${Math.random()}` };
         setNotifications(prev => [...prev, newNotification]);
     }, []);
 
+    // Configuration for care type notifications: text, icon, and specific color
     const careTypeDetails = {
-        [CareType.WATER]: { name: CARE_TYPE_RUSSIAN[CareType.WATER], Icon: <WaterDropIcon className="w-5 h-5 text-blue-400" /> },
-        [CareType.FERTILIZE]: { name: CARE_TYPE_RUSSIAN[CareType.FERTILIZE], Icon: <FertilizerIcon className="w-5 h-5 text-purple-400" /> },
-        [CareType.REPOT]: { name: CARE_TYPE_RUSSIAN[CareType.REPOT], Icon: <SpadeIcon className="w-5 h-5 text-yellow-600" /> },
-        [CareType.TRIM]: { name: CARE_TYPE_RUSSIAN[CareType.TRIM], Icon: <ScissorsIcon className="w-5 h-5 text-orange-400" /> },
+        [CareType.WATER]: { 
+            name: CARE_TYPE_RUSSIAN[CareType.WATER], 
+            icon: <WaterDropIcon className="w-5 h-5 text-blue-500" /> 
+        },
+        [CareType.FERTILIZE]: { 
+            name: CARE_TYPE_RUSSIAN[CareType.FERTILIZE], 
+            icon: <FertilizerIcon className="w-5 h-5 text-purple-500" /> 
+        },
+        [CareType.REPOT]: { 
+            name: CARE_TYPE_RUSSIAN[CareType.REPOT], 
+            icon: <SpadeIcon className="w-5 h-5 text-yellow-700" /> 
+        },
+        [CareType.TRIM]: { 
+            name: CARE_TYPE_RUSSIAN[CareType.TRIM], 
+            icon: <ScissorsIcon className="w-5 h-5 text-orange-500" /> 
+        },
     };
 
     useEffect(() => {
@@ -147,12 +184,12 @@ const AppContent: React.FC = () => {
                     if (daysUntil >= 0 && daysUntil <= 2) {
                         const reminderKey = `${plant.id}-${type}-${taskDate.toISOString().split('T')[0]}`;
                         if (!shownReminders.has(reminderKey)) {
-                            const { name, Icon } = careTypeDetails[type];
+                            const { name, icon } = careTypeDetails[type];
                             const dueText = daysUntil === 0 ? 'Сегодня' : (daysUntil === 1 ? 'Завтра' : `Через ${daysUntil} дня`);
                             newNotifications.push({
                                 id: `${reminderKey}-${Date.now()}`,
                                 message: `${dueText} пора ${name.toLowerCase()}: ${plant.name}`,
-                                icon: Icon,
+                                icon: icon,
                             });
                             newReminderKeys.add(reminderKey);
                         }

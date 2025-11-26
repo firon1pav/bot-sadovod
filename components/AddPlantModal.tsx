@@ -1,8 +1,11 @@
+
+
 import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import { Plant, PlantLocation, PlantType } from '../types';
 import { PLANT_LOCATIONS_OPTIONS, PLANT_TYPES_OPTIONS } from '../constants';
 import { PLANT_LOCATION_RUSSIAN, PLANT_TYPE_RUSSIAN } from '../utils';
-import { UploadIcon } from './icons';
+import { UploadIcon, SparklesIcon } from './icons';
+import { identifyPlant } from '../services/ai';
 
 interface AddPlantModalProps {
   isOpen: boolean;
@@ -18,6 +21,11 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
   const [customType, setCustomType] = useState('');
   const [lastWateredAt, setLastWateredAt] = useState(new Date().toISOString().split('T')[0]);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [wateringFrequency, setWateringFrequency] = useState<number | undefined>(undefined);
+  
+  const [isIdentifying, setIsIdentifying] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -30,6 +38,9 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
         setCustomType('');
         setLastWateredAt(new Date().toISOString().split('T')[0]);
         setPhotoUrl(null);
+        setWateringFrequency(undefined);
+        setIsIdentifying(false);
+        setAiError(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
@@ -42,9 +53,44 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoUrl(reader.result as string);
+        setAiError(null);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleIdentify = async () => {
+      if (!photoUrl) return;
+      
+      setIsIdentifying(true);
+      setAiError(null);
+      
+      try {
+          const result = await identifyPlant(photoUrl);
+          console.log("AI Result:", result);
+          
+          if (result.name) setName(result.name);
+          
+          if (result.type) {
+              const upperType = result.type.toUpperCase();
+              if (Object.values(PlantType).includes(upperType as PlantType)) {
+                  setType(upperType as PlantType);
+              } else {
+                  setType(PlantType.OTHER);
+                  setCustomType(result.type);
+              }
+          }
+          
+          if (result.wateringFrequencyDays) {
+              setWateringFrequency(result.wateringFrequencyDays);
+          }
+
+      } catch (error) {
+          console.error("AI Identification failed", error);
+          setAiError("Не удалось определить растение. Попробуйте другое фото.");
+      } finally {
+          setIsIdentifying(false);
+      }
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -58,7 +104,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
       type,
       customType: type === PlantType.OTHER ? customType : undefined,
       lastWateredAt: new Date(lastWateredAt),
-      wateringFrequencyDays: 0, // This will be set by the hook based on type
+      wateringFrequencyDays: wateringFrequency || 0, // MockData hook calculates if 0/undefined, but we pass overrides now
     };
     onAddPlant(newPlant);
   };
@@ -71,7 +117,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
         <h2 className="text-xl font-bold mb-4">Добавить новое растение</h2>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center gap-3">
                 <input type="file" ref={fileInputRef} onChange={handlePhotoChange} style={{ display: 'none' }} accept="image/*" />
                 <button
                     type="button"
@@ -87,6 +133,22 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
                         </div>
                     )}
                 </button>
+                {photoUrl && !isIdentifying && (
+                    <button
+                        type="button"
+                        onClick={handleIdentify}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-full text-xs font-bold hover:opacity-90 transition-opacity"
+                    >
+                        <SparklesIcon className="w-4 h-4" />
+                        Определить по фото
+                    </button>
+                )}
+                 {isIdentifying && (
+                     <div className="text-xs text-primary animate-pulse">Изучаю растение...</div>
+                 )}
+                 {aiError && (
+                     <div className="text-xs text-red-500 text-center">{aiError}</div>
+                 )}
             </div>
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-foreground/80 mb-1">Название растения</label>

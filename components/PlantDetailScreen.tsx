@@ -1,8 +1,12 @@
+
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Plant, CareType, PlantLocation, PlantType } from '../types';
-import { BackIcon, EditIcon, SaveIcon, CloseIcon, WaterDropIcon, ScissorsIcon, SpadeIcon, FertilizerIcon, UploadIcon, CalendarIcon, TrashIcon } from './icons';
+import { BackIcon, EditIcon, SaveIcon, CloseIcon, WaterDropIcon, ScissorsIcon, SpadeIcon, FertilizerIcon, UploadIcon, CalendarIcon, TrashIcon, StethoscopeIcon, ChatBubbleIcon } from './icons';
 import { PLANT_LOCATION_RUSSIAN, PLANT_TYPE_RUSSIAN } from '../utils';
 import { PLANT_LOCATIONS_OPTIONS, PLANT_TYPES_OPTIONS } from '../constants';
+import AiDoctorModal from './AiDoctorModal';
+import AiChatModal from './AiChatModal';
 
 interface EditableSchedule {
     wateringFrequencyDays?: number;
@@ -22,6 +26,9 @@ interface PlantDetailScreenProps {
 const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, onUpdatePlant, onLogCareEvent, onDeletePlant }) => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [isDoctorOpen, setIsDoctorOpen] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    
     const [editablePlant, setEditablePlant] = useState(plant);
     
     const initialSchedule = useMemo(() => ({
@@ -139,6 +146,24 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
                         Загрузить
                     </button>
                 </div>
+
+                {/* AI Tools */}
+                <div className="flex gap-3 mb-6">
+                    <button 
+                        onClick={() => setIsDoctorOpen(true)}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl font-semibold hover:bg-red-500/20 transition-colors"
+                    >
+                        <StethoscopeIcon className="w-5 h-5" />
+                        Доктор
+                    </button>
+                    <button 
+                         onClick={() => setIsChatOpen(true)}
+                         className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary/10 text-primary rounded-xl font-semibold hover:bg-primary/20 transition-colors"
+                    >
+                        <ChatBubbleIcon className="w-5 h-5" />
+                        Чат с ботаником
+                    </button>
+                </div>
                 
                 {/* Log Care Actions */}
                 <div className="mb-6">
@@ -246,6 +271,14 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
                     </button>
                 </div>
             </div>
+
+            {/* AI Modals */}
+            {isDoctorOpen && (
+                <AiDoctorModal plant={plant} onClose={() => setIsDoctorOpen(false)} />
+            )}
+            {isChatOpen && (
+                <AiChatModal plant={plant} onClose={() => setIsChatOpen(false)} />
+            )}
 
             {/* Edit Modal/Form */}
             {isEditModalOpen && (
