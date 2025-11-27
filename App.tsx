@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import Header from './components/Header';
@@ -43,10 +42,20 @@ const PlantDetailRoute = ({ plants, onUpdatePlant, onLogCareEvent, onDeletePlant
     );
 };
 
-const CommunityDetailRoute = ({ communities, communityPosts, comments, user, leaveCommunity, joinCommunity, addPost, updatePost, deletePost, addComment, likedPostIds, toggleLikePost, addNotification, timeAgo }: any) => {
+const CommunityDetailRoute = ({ 
+    communities, communityPosts, comments, user, leaveCommunity, joinCommunity, 
+    addPost, updatePost, deletePost, addComment, fetchComments, likedPostIds, toggleLikePost, 
+    addNotification, timeAgo, fetchCommunityPosts 
+}: any) => {
     const { id } = useParams();
     const navigate = useNavigate();
     const community = communities.find((c: Community) => c.id === id);
+
+    useEffect(() => {
+        if (id) {
+            fetchCommunityPosts(id);
+        }
+    }, [id, fetchCommunityPosts]);
 
     if (!community) return <Navigate to="/profile" replace />;
 
@@ -66,6 +75,7 @@ const CommunityDetailRoute = ({ communities, communityPosts, comments, user, lea
             onUpdatePost={updatePost}
             onDeletePost={deletePost}
             onAddComment={addComment}
+            onFetchComments={fetchComments}
             likedPostIds={likedPostIds}
             toggleLikePost={toggleLikePost}
             addNotification={addNotification}
@@ -74,17 +84,24 @@ const CommunityDetailRoute = ({ communities, communityPosts, comments, user, lea
     );
 };
 
-const FriendProfileRoute = ({ getUserById, plants, levelInfo, removeFriend }: any) => {
+const FriendProfileRoute = ({ getUserById, getFriendPlants, levelInfo, removeFriend }: any) => {
     const { id } = useParams();
     const navigate = useNavigate();
     const friend = getUserById(id);
+    const [friendPlants, setFriendPlants] = useState<Plant[]>([]);
+    
+    useEffect(() => {
+        if (friend && friend.id) {
+            getFriendPlants(friend.id).then((plants: Plant[]) => setFriendPlants(plants));
+        }
+    }, [friend, getFriendPlants]);
 
     if (!friend) return <Navigate to="/profile" replace />;
 
     return (
         <FriendProfileScreen
             friend={friend}
-            plants={plants.filter((p: Plant) => p.userId === friend.id)}
+            plants={friendPlants}
             levelInfo={levelInfo}
             onBack={() => navigate(-1)}
             onRemoveFriend={(fid) => {
@@ -103,8 +120,8 @@ const AppContent: React.FC = () => {
         plants, user, stats, levelInfo, achievements, communities, communityPosts, comments, careEvents,
         likedPostIds, toggleLikePost, getUserById, pendingNotifications, clearPendingNotifications,
         addPlant, updatePlant, deletePlant, logCareEvent, updateUser, joinCommunity, leaveCommunity,
-        createCommunity, addPost, updatePost, deletePost, addComment, searchUserByTelegram, addFriend,
-        removeFriend, pendingFriendRequests, handleFriendRequestAction
+        createCommunity, addPost, updatePost, deletePost, addComment, fetchComments, searchUserByTelegram, addFriend,
+        removeFriend, pendingFriendRequests, handleFriendRequestAction, fetchCommunityPosts, getFriendPlants
     } = useMockData();
 
     const navigate = useNavigate();
@@ -215,7 +232,7 @@ const AppContent: React.FC = () => {
         setNotifications(prev => prev.filter(n => n.id !== id));
     };
 
-    const handleAddPlant = (newPlantData: Omit<Plant, 'id' | 'createdAt'>) => {
+    const handleAddPlant = (newPlantData: any) => {
         addPlant(newPlantData);
         setIsAddPlantModalOpen(false);
     };
@@ -314,16 +331,18 @@ const AppContent: React.FC = () => {
                                 updatePost={updatePost}
                                 deletePost={deletePost}
                                 addComment={addComment}
+                                fetchComments={fetchComments}
                                 likedPostIds={likedPostIds}
                                 toggleLikePost={toggleLikePost}
                                 addNotification={addNotification}
                                 timeAgo={timeAgo}
+                                fetchCommunityPosts={fetchCommunityPosts}
                             />
                         } />
                         <Route path="/friends/:id" element={
                             <FriendProfileRoute 
                                 getUserById={getUserById}
-                                plants={plants}
+                                getFriendPlants={getFriendPlants}
                                 levelInfo={levelInfo}
                                 removeFriend={removeFriend}
                             />

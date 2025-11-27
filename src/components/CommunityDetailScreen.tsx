@@ -116,8 +116,8 @@ interface CommunityDetailScreenProps {
   onBack: () => void;
   onLeaveCommunity: (communityId: string) => void;
   onJoinCommunity: (communityId: string) => void;
-  onAddPost: (communityId: string, data: { text: string; photoUrl?: string }) => void;
-  onUpdatePost: (postId: string, data: { text: string; photoUrl?: string }) => void;
+  onAddPost: (communityId: string, data: any) => void;
+  onUpdatePost: (postId: string, data: any) => void;
   onDeletePost: (postId: string) => void;
   onAddComment: (postId: string, text: string) => void;
   onFetchComments: (postId: string) => void;
@@ -138,12 +138,12 @@ const CommunityDetailScreen: React.FC<CommunityDetailScreenProps> = ({
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
   const [reportingPost, setReportingPost] = useState<CommunityPost | null>(null);
 
-  const handleCreatePost = (data: { text: string; photoUrl?: string }) => {
+  const handleCreatePost = (data: any) => {
     onAddPost(community.id, data);
     setIsCreatePostModalOpen(false);
   };
   
-  const handleSavePost = (postId: string, data: { text: string; photoUrl?: string }) => {
+  const handleSavePost = (postId: string, data: any) => {
     onUpdatePost(postId, data);
     setEditingPost(null);
   };

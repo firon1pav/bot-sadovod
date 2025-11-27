@@ -222,6 +222,11 @@ export const useMockData = () => {
         return ALL_MOCK_USERS.find(u => u.id === id);
     }, [user, ALL_MOCK_USERS]);
 
+    const getFriendPlants = useCallback(async (friendId: string) => {
+        // Mock implementation to return empty or random plants for friends
+        return [];
+    }, []);
+
     const addPlant = useCallback((plantData: Omit<Plant, 'id' | 'createdAt'>) => {
         const newPlant: Plant = {
             ...plantData,
@@ -419,6 +424,10 @@ export const useMockData = () => {
         addXp(2);
     }, [user]);
 
+    const fetchComments = useCallback((postId: string) => {
+        // Mock implementation
+    }, []);
+
     const toggleLikePost = useCallback((postId: string) => {
         setLikedPostIds(prev => {
             const newSet = new Set(prev);
@@ -443,7 +452,6 @@ export const useMockData = () => {
 
     const addFriend = useCallback((friendUser: User) => {
         // In real app, send request. Here, just add to friends directly for simplicity or mock request?
-        // Let's mock instant add for now or simulated request cycle?
         // Requirement says "addFriend", let's assume it sends a request or instantly adds if it's a mock.
         // Let's assume instant for MOCK purposes unless it matches specific logic.
         
@@ -483,6 +491,10 @@ export const useMockData = () => {
         setPendingNotifications([]);
     }, []);
 
+    const fetchCommunityPosts = useCallback((communityId: string) => {
+        // Mock implementation: do nothing as data is local
+    }, []);
+
     return {
         user,
         plants,
@@ -497,6 +509,7 @@ export const useMockData = () => {
         pendingNotifications,
         pendingFriendRequests,
         getUserById,
+        getFriendPlants,
         addPlant,
         updatePlant,
         deletePlant,
@@ -509,11 +522,13 @@ export const useMockData = () => {
         updatePost,
         deletePost,
         addComment,
+        fetchComments,
         toggleLikePost,
         searchUserByTelegram,
         addFriend,
         removeFriend,
         handleFriendRequestAction,
-        clearPendingNotifications
+        clearPendingNotifications,
+        fetchCommunityPosts
     };
 };
