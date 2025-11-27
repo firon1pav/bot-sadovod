@@ -38,6 +38,7 @@ const INITIAL_USER: User = {
 };
 
 export const useMockData = () => {
+    const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User>(INITIAL_USER);
     const [plants, setPlants] = useState<Plant[]>([]);
     const [communities, setCommunities] = useState<Community[]>([]);
@@ -55,9 +56,14 @@ export const useMockData = () => {
 
     // --- REAL API INTEGRATION ---
     const fetchData = useCallback(async () => {
+        setIsLoading(true);
         try {
-            // Load essential data
-            const [userData, plantsData, communitiesData, friendRequests] = await Promise.all([
+            // Artificial delay to show the growing plant animation (min 2.5s)
+            const minLoadTime = new Promise(resolve => setTimeout(resolve, 2500));
+
+            // Load essential data in parallel with the timer
+            const [_, userData, plantsData, communitiesData, friendRequests] = await Promise.all([
+                minLoadTime,
                 api.getProfile(),
                 api.getPlants(),
                 api.getCommunities(),
@@ -110,6 +116,8 @@ export const useMockData = () => {
 
         } catch (error) {
             console.error("Failed to fetch initial data", error);
+        } finally {
+            setIsLoading(false);
         }
     }, []);
 
@@ -440,6 +448,7 @@ export const useMockData = () => {
     }, []);
 
     return {
+        isLoading,
         user,
         plants,
         communities,

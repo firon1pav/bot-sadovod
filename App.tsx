@@ -11,12 +11,14 @@ import AddPlantModal from './components/AddPlantModal';
 import CommunityDetailScreen from './components/CommunityDetailScreen';
 import NotificationToast from './components/NotificationToast';
 import FriendProfileScreen from './components/FriendProfileScreen';
+// Strict relative path to fix module resolution error
+import GrowingPlantLoader from './components/GrowingPlantLoader';
 // @ts-ignore
 import confetti from 'canvas-confetti';
 
 import { useMockData } from './hooks/useMockData';
 import { Plant, Community, CareType, Notification, User } from './types';
-import { PlusIcon, WaterDropIcon, FertilizerIcon, SpadeIcon, ScissorsIcon, BellIcon } from './components/icons';
+import { PlusIcon, WaterDropIcon, FertilizerIcon, SpadeIcon, ScissorsIcon } from './components/icons';
 import { CARE_TYPE_RUSSIAN } from './utils';
 
 // --- Route Wrappers ---
@@ -31,7 +33,7 @@ const PlantDetailRoute = ({ plants, onUpdatePlant, onLogCareEvent, onDeletePlant
     return (
         <PlantDetailScreen
             plant={plant}
-            onBack={() => navigate(-1)}
+            onBack={() => navigate('/')} 
             onUpdatePlant={onUpdatePlant}
             onLogCareEvent={onLogCareEvent}
             onDeletePlant={(plantId) => {
@@ -65,7 +67,7 @@ const CommunityDetailRoute = ({
             posts={communityPosts.filter((p: any) => p.communityId === community.id)}
             comments={comments}
             currentUser={user}
-            onBack={() => navigate(-1)}
+            onBack={() => navigate('/profile')} 
             onLeaveCommunity={(cid) => {
                  leaveCommunity(cid);
                  navigate('/profile'); 
@@ -103,7 +105,7 @@ const FriendProfileRoute = ({ getUserById, getFriendPlants, levelInfo, removeFri
             friend={friend}
             plants={friendPlants}
             levelInfo={levelInfo}
-            onBack={() => navigate(-1)}
+            onBack={() => navigate('/profile')}
             onRemoveFriend={(fid) => {
                 removeFriend(fid);
                 navigate('/profile');
@@ -117,6 +119,7 @@ const FriendProfileRoute = ({ getUserById, getFriendPlants, levelInfo, removeFri
 
 const AppContent: React.FC = () => {
     const {
+        isLoading,
         plants, user, stats, levelInfo, achievements, communities, communityPosts, comments, careEvents,
         likedPostIds, toggleLikePost, getUserById, pendingNotifications, clearPendingNotifications,
         addPlant, updatePlant, deletePlant, logCareEvent, updateUser, joinCommunity, leaveCommunity,
@@ -140,7 +143,6 @@ const AppContent: React.FC = () => {
                 zIndex: 100,
                 colors: ['#22C55E', '#3B82F6', '#FACC15', '#EC4899']
             });
-            // You could also add a dedicated modal or toast here
             addNotification({
                 message: `Новый уровень! Теперь вы ${levelInfo.levelName}`,
                 icon: <span className="text-xl">🎉</span>
@@ -154,7 +156,6 @@ const AppContent: React.FC = () => {
         setNotifications(prev => [...prev, newNotification]);
     }, []);
 
-    // Configuration for care type notifications: text, icon, and specific color
     const careTypeDetails = {
         [CareType.WATER]: { 
             name: CARE_TYPE_RUSSIAN[CareType.WATER], 
@@ -252,9 +253,14 @@ const AppContent: React.FC = () => {
         return "только что";
     }, []);
 
+    // --- Loading State ---
+    if (isLoading) {
+        return <GrowingPlantLoader />;
+    }
+
     return (
         <div className="bg-background text-foreground min-h-screen font-sans">
-            <div className="fixed top-4 right-4 z-50 w-full max-w-sm space-y-2">
+            <div className="fixed top-4 right-4 z-[60] w-full max-w-sm space-y-2">
                 {notifications.map(notification => (
                     <NotificationToast
                         key={notification.id}
@@ -370,3 +376,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+    

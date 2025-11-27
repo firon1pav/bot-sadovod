@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Plant, User, Stats, LevelInfo, Achievement, Community, CommunityPost, Comment, CareEvent,
@@ -172,6 +171,7 @@ const MOCK_CARE_EVENTS: CareEvent[] = [
 ];
 
 export const useMockData = () => {
+    const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User>(ALL_MOCK_USERS[0]);
     const [plants, setPlants] = useState<Plant[]>(MOCK_PLANTS_DATA);
     const [communities, setCommunities] = useState<Community[]>(MOCK_COMMUNITIES);
@@ -204,6 +204,14 @@ export const useMockData = () => {
              friends: []
         }
     ]);
+    
+    // Simulate loading
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsLoading(false);
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, []);
 
     // --- Actions ---
 
@@ -496,6 +504,7 @@ export const useMockData = () => {
     }, []);
 
     return {
+        isLoading,
         user,
         plants,
         communities,
