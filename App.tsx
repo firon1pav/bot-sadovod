@@ -1,6 +1,10 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+// @ts-ignore
+import confetti from 'canvas-confetti';
+
+// Components
 import Header from './components/Header';
 import Navbar from './components/Navbar';
 import PlantCard from './components/PlantCard';
@@ -11,10 +15,7 @@ import AddPlantModal from './components/AddPlantModal';
 import CommunityDetailScreen from './components/CommunityDetailScreen';
 import NotificationToast from './components/NotificationToast';
 import FriendProfileScreen from './components/FriendProfileScreen';
-// Strict relative path to fix module resolution error
-import GrowingPlantLoader from './components/GrowingPlantLoader';
-// @ts-ignore
-import confetti from 'canvas-confetti';
+import GrowingPlantLoader from './components/GrowingPlantLoader'; // Correct relative path
 
 import { useMockData } from './hooks/useMockData';
 import { Plant, Community, CareType, Notification, User } from './types';
@@ -376,4 +377,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-    
