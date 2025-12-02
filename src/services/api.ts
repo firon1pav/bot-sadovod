@@ -1,7 +1,19 @@
 
 import { Plant, User, Community, CommunityPost, Comment } from '../types';
 
-const BASE_URL = 'http://localhost:3000/api';
+// --- Dynamic URL Resolution ---
+// 1. Priority: Explicit VITE_API_URL from .env file
+// 2. Fallback (Production): '/api' (Relative path, assumes frontend and backend are on the same domain)
+// 3. Fallback (Development): 'http://localhost:3000/api'
+
+// @ts-ignore
+const ENV_API_URL = import.meta.env.VITE_API_URL;
+// @ts-ignore
+const IS_PROD = import.meta.env.PROD;
+
+const BASE_URL = ENV_API_URL || (IS_PROD ? '/api' : 'http://localhost:3000/api');
+
+console.log('API Configured at:', BASE_URL);
 
 const getHeaders = () => {
     // @ts-ignore
@@ -30,23 +42,44 @@ const request = async (endpoint: string, options: Omit<RequestInit, 'body'> & { 
         }
     }
 
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-        ...options,
-        headers,
-        body: options.body as BodyInit,
-    });
+    // Handle relative URLs correctly if BASE_URL is just '/api'
+    const url = BASE_URL.startsWith('http') 
+        ? `${BASE_URL}${endpoint}` 
+        : `${window.location.origin}${BASE_URL}${endpoint}`;
 
-    if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
-    }
+    try {
+        const response = await fetch(url, {
+            ...options,
+            headers,
+            body: options.body as BodyInit,
+        });
 
-    // Handle text responses (like from AI diagnose/chat)
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.indexOf("application/json") !== -1) {
-        const text = await response.text();
-        return JSON.parse(text, parseISOString);
-    } else {
-        return response.text();
+        if (!response.ok) {
+            let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+            try {
+                // Try to parse the error message from the backend JSON
+                const errorBody = await response.json();
+                if (errorBody && errorBody.error) {
+                    errorMessage = errorBody.error;
+                }
+            } catch (e) {
+                // Response was not JSON, stick to the generic message
+            }
+            throw new Error(errorMessage);
+        }
+
+        // Handle text responses (like from AI diagnose/chat) or JSON
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+            const text = await response.text();
+            return JSON.parse(text, parseISOString);
+        } else {
+            return response.text();
+        }
+    } catch (error: any) {
+        // Re-throw the error so the caller handles it
+        console.error(`Request failed to ${endpoint}:`, error.message);
+        throw error;
     }
 };
 

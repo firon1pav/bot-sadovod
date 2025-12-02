@@ -172,6 +172,7 @@ const MOCK_CARE_EVENTS: CareEvent[] = [
 
 export const useMockData = () => {
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [user, setUser] = useState<User>(ALL_MOCK_USERS[0]);
     const [plants, setPlants] = useState<Plant[]>(MOCK_PLANTS_DATA);
     const [communities, setCommunities] = useState<Community[]>(MOCK_COMMUNITIES);
@@ -211,6 +212,14 @@ export const useMockData = () => {
             setIsLoading(false);
         }, 1000);
         return () => clearTimeout(timer);
+    }, []);
+
+    const retryFetch = useCallback(() => {
+        setIsLoading(true);
+        setError(null);
+        setTimeout(() => {
+            setIsLoading(false);
+        }, 1000);
     }, []);
 
     // --- Actions ---
@@ -505,6 +514,7 @@ export const useMockData = () => {
 
     return {
         isLoading,
+        error,
         user,
         plants,
         communities,
@@ -538,6 +548,7 @@ export const useMockData = () => {
         removeFriend,
         handleFriendRequestAction,
         clearPendingNotifications,
-        fetchCommunityPosts
+        fetchCommunityPosts,
+        retryFetch
     };
 };

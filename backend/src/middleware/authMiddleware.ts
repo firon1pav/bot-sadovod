@@ -5,7 +5,7 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-// В продакшене эту функцию нужно использовать для проверки подписи
+// Validate Telegram Web App Init Data
 const verifyTelegramWebAppData = (telegramInitData: string): boolean => {
   const token = process.env.BOT_TOKEN;
   if (!token) return false;
@@ -31,8 +31,8 @@ export const authMiddleware = async (req: any, res: any, next: NextFunction) => 
   try {
     const authHeader = req.headers.authorization;
     
-    // ДЛЯ РАЗРАБОТКИ (пока нет реального токена):
-    // Если заголовка нет, используем тестового пользователя
+    // DEVELOPMENT MODE BYPASS
+    // If no header and in development, create/use a dev user.
     if (!authHeader && process.env.NODE_ENV === 'development') {
         let devUser = await prisma.user.findFirst({ where: { username: 'dev_user' } });
         if (!devUser) {
@@ -48,12 +48,17 @@ export const authMiddleware = async (req: any, res: any, next: NextFunction) => 
       return res.status(401).json({ error: 'No authorization header' });
     }
 
-    // В реальном приложении раскомментировать проверку:
-    // if (!verifyTelegramWebAppData(authHeader)) {
-    //    return res.status(403).json({ error: 'Invalid Telegram data' });
-    // }
+    // PRODUCTION SECURITY CHECK
+    // Strictly verify the data signature to prevent spoofing
+    if (process.env.NODE_ENV === 'production') {
+        const isValid = verifyTelegramWebAppData(authHeader);
+        if (!isValid) {
+           console.warn("Invalid Telegram InitData signature");
+           return res.status(403).json({ error: 'Invalid Telegram data' });
+        }
+    }
 
-    // Парсим данные из initData (это строка query params)
+    // Parse data from initData (query params string)
     const params = new URLSearchParams(authHeader);
     const userStr = params.get('user');
     
@@ -63,7 +68,7 @@ export const authMiddleware = async (req: any, res: any, next: NextFunction) => 
 
     const telegramUser = JSON.parse(userStr);
     
-    // Upsert пользователя (найти или создать/обновить)
+    // Upsert User
     const user = await prisma.user.upsert({
         where: { telegramId: BigInt(telegramUser.id) },
         update: {

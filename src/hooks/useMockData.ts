@@ -39,6 +39,7 @@ const INITIAL_USER: User = {
 
 export const useMockData = () => {
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [user, setUser] = useState<User>(INITIAL_USER);
     const [plants, setPlants] = useState<Plant[]>([]);
     const [communities, setCommunities] = useState<Community[]>([]);
@@ -57,6 +58,7 @@ export const useMockData = () => {
     // --- REAL API INTEGRATION ---
     const fetchData = useCallback(async () => {
         setIsLoading(true);
+        setError(null);
         try {
             // Artificial delay to show the growing plant animation (min 2.5s)
             const minLoadTime = new Promise(resolve => setTimeout(resolve, 2500));
@@ -114,8 +116,9 @@ export const useMockData = () => {
                 setAchievements(earned);
             }
 
-        } catch (error) {
-            console.error("Failed to fetch initial data", error);
+        } catch (err: any) {
+            console.error("Failed to fetch initial data", err);
+            setError(err.message || "Не удалось загрузить данные. Проверьте соединение.");
         } finally {
             setIsLoading(false);
         }
@@ -265,9 +268,9 @@ export const useMockData = () => {
                     icon: React.createElement(FirstFriendIcon, { className: "w-5 h-5 text-blue-500" })
                 }
             ]);
-        } catch (e) {
+        } catch (e: any) {
             console.error("Add friend failed", e);
-            alert("Не удалось отправить заявку. Возможно, вы уже друзья или заявка отправлена.");
+            alert(e.message || "Не удалось отправить заявку.");
         }
     }, []);
 
@@ -449,6 +452,7 @@ export const useMockData = () => {
 
     return {
         isLoading,
+        error,
         user,
         plants,
         communities,
@@ -482,6 +486,7 @@ export const useMockData = () => {
         removeFriend,
         handleFriendRequestAction,
         clearPendingNotifications,
-        fetchCommunityPosts
+        fetchCommunityPosts,
+        retryFetch: fetchData // Expose for error screen
     };
 };
