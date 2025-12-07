@@ -1,17 +1,22 @@
+
 import React, { useState, FormEvent, useRef, useEffect } from 'react';
-import { Community } from '../types';
 import { CloseIcon, UploadIcon, UsersIcon } from './icons';
+import { compressImage } from '../utils';
 
 interface CreateCommunityModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (communityData: Omit<Community, 'id' | 'memberCount' | 'isMember'>) => void;
+  // Handler now expects FormData
+  onCreate: (communityData: any) => void; 
 }
 
 const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({ isOpen, onClose, onCreate }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -19,29 +24,41 @@ const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({ isOpen, onC
         setName('');
         setDescription('');
         setPhotoUrl(null);
+        setPhotoFile(null);
+        setIsCompressing(false);
     }
   }, [isOpen]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      const originalFile = e.target.files[0];
+      setIsCompressing(true);
+      try {
+          const compressedFile = await compressImage(originalFile);
+          setPhotoFile(compressedFile);
+          setPhotoUrl(URL.createObjectURL(compressedFile));
+      } catch (err) {
+          console.error("Compression failed", err);
+          setPhotoFile(originalFile);
+          setPhotoUrl(URL.createObjectURL(originalFile));
+      } finally {
+          setIsCompressing(false);
+      }
     }
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !description.trim()) return;
+    if (!name.trim() || !description.trim() || isCompressing) return;
 
-    onCreate({
-      name,
-      description,
-      photoUrl: photoUrl || `https://picsum.photos/seed/${name.replace(/\s/g, '')}/200/200`,
-    });
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('description', description);
+    if (photoFile) {
+        formData.append('photo', photoFile);
+    }
+
+    onCreate(formData);
   };
 
   if (!isOpen) return null;
@@ -62,9 +79,12 @@ const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({ isOpen, onC
                 <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="relative w-24 h-24 rounded-full bg-accent flex items-center justify-center text-foreground/50 hover:bg-accent/80 transition-colors"
+                    disabled={isCompressing}
+                    className="relative w-24 h-24 rounded-full bg-accent flex items-center justify-center text-foreground/50 hover:bg-accent/80 transition-colors disabled:opacity-50"
                 >
-                    {photoUrl ? (
+                    {isCompressing ? (
+                        <div className="w-6 h-6 border-2 border-foreground/50 border-t-transparent rounded-full animate-spin"></div>
+                    ) : photoUrl ? (
                         <img src={photoUrl} alt="Превью" className="w-full h-full rounded-full object-cover"/>
                     ) : (
                         <div className="text-center">
@@ -85,7 +105,7 @@ const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({ isOpen, onC
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-full text-sm font-semibold hover:bg-accent transition-colors">Отмена</button>
-            <button type="submit" className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2">
+            <button type="submit" disabled={isCompressing} className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50">
                 <UsersIcon className="w-4 h-4" /> Создать
             </button>
           </div>

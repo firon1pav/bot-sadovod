@@ -1,12 +1,12 @@
 
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Plant, CareType, PlantLocation, PlantType } from '../types';
 import { BackIcon, EditIcon, SaveIcon, CloseIcon, WaterDropIcon, ScissorsIcon, SpadeIcon, FertilizerIcon, UploadIcon, CalendarIcon, TrashIcon, StethoscopeIcon, ChatBubbleIcon } from './icons';
-import { PLANT_LOCATION_RUSSIAN, PLANT_TYPE_RUSSIAN } from '../utils';
+import { PLANT_LOCATION_RUSSIAN, PLANT_TYPE_RUSSIAN, compressImage } from '../utils';
 import { PLANT_LOCATIONS_OPTIONS, PLANT_TYPES_OPTIONS } from '../constants';
 import AiDoctorModal from './AiDoctorModal';
 import AiChatModal from './AiChatModal';
+import TimelapseModal from './TimelapseModal';
 
 interface EditableSchedule {
     wateringFrequencyDays?: number;
@@ -18,7 +18,7 @@ interface EditableSchedule {
 interface PlantDetailScreenProps {
   plant: Plant;
   onBack: () => void;
-  onUpdatePlant: (plantId: string, updatedData: Partial<Omit<Plant, 'id'>>) => void;
+  onUpdatePlant: (plantId: string, updatedData: any) => void;
   onLogCareEvent: (plantId: string, type: CareType) => void;
   onDeletePlant: (plantId: string) => void;
 }
@@ -28,14 +28,16 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [isDoctorOpen, setIsDoctorOpen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isTimelapseOpen, setIsTimelapseOpen] = useState(false);
     
     const [editablePlant, setEditablePlant] = useState(plant);
+    const [isCompressing, setIsCompressing] = useState(false);
     
     const initialSchedule = useMemo(() => ({
         wateringFrequencyDays: plant.wateringFrequencyDays,
-        nextFertilizingDate: plant.nextFertilizingDate?.toISOString().split('T')[0],
-        nextRepottingDate: plant.nextRepottingDate?.toISOString().split('T')[0],
-        nextTrimmingDate: plant.nextTrimmingDate?.toISOString().split('T')[0],
+        nextFertilizingDate: plant.nextFertilizingDate ? new Date(plant.nextFertilizingDate).toISOString().split('T')[0] : undefined,
+        nextRepottingDate: plant.nextRepottingDate ? new Date(plant.nextRepottingDate).toISOString().split('T')[0] : undefined,
+        nextTrimmingDate: plant.nextTrimmingDate ? new Date(plant.nextTrimmingDate).toISOString().split('T')[0] : undefined,
     }), [plant]);
 
     const [schedule, setSchedule] = useState<EditableSchedule>(initialSchedule);
@@ -71,11 +73,23 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
         setIsEditModalOpen(false);
     };
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const newPhotoUrl = URL.createObjectURL(file);
-            onUpdatePlant(plant.id, { photoUrl: newPhotoUrl });
+            const originalFile = e.target.files[0];
+            setIsCompressing(true);
+            
+            try {
+                const compressedFile = await compressImage(originalFile);
+                const formData = new FormData();
+                formData.append('photo', compressedFile);
+                onUpdatePlant(plant.id, formData);
+            } catch (err) {
+                const formData = new FormData();
+                formData.append('photo', originalFile);
+                onUpdatePlant(plant.id, formData);
+            } finally {
+                setIsCompressing(false);
+            }
         }
     };
     
@@ -140,8 +154,22 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
                 {/* Photo */}
                 <div className="relative mb-6">
                     <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept="image/*" />
-                    <img src={plant.photoUrl} alt={plant.name} className="w-full h-64 object-cover rounded-2xl" />
-                    <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-3 right-3 bg-card/80 text-card-foreground p-2 rounded-full shadow-lg hover:bg-card flex items-center gap-2 text-sm px-3">
+                    <img src={plant.photoUrl} alt={plant.name} className={`w-full h-64 object-cover rounded-2xl ${isCompressing ? 'opacity-50' : ''}`} />
+                    {isCompressing && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    )}
+                    
+                    {/* Timelapse Button - Bottom Left */}
+                    <button 
+                        onClick={() => setIsTimelapseOpen(true)}
+                        className="absolute bottom-3 left-3 bg-black/50 hover:bg-black/70 backdrop-blur-md text-white p-2 pr-3 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold transition-all active:scale-95 border border-white/10"
+                    >
+                        <span>▶</span> Живой альбом
+                    </button>
+
+                    <button onClick={() => fileInputRef.current?.click()} disabled={isCompressing} className="absolute bottom-3 right-3 bg-card/80 text-card-foreground p-2 rounded-full shadow-lg hover:bg-card flex items-center gap-2 text-sm px-3 disabled:opacity-50 transition-all active:scale-95">
                         <UploadIcon className="w-4 h-4" />
                         Загрузить
                     </button>
@@ -151,14 +179,14 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
                 <div className="flex gap-3 mb-6">
                     <button 
                         onClick={() => setIsDoctorOpen(true)}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl font-semibold hover:bg-red-500/20 transition-colors"
+                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl font-semibold hover:bg-red-500/20 transition-colors active:scale-95"
                     >
                         <StethoscopeIcon className="w-5 h-5" />
                         Доктор
                     </button>
                     <button 
                          onClick={() => setIsChatOpen(true)}
-                         className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary/10 text-primary rounded-xl font-semibold hover:bg-primary/20 transition-colors"
+                         className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary/10 text-primary rounded-xl font-semibold hover:bg-primary/20 transition-colors active:scale-95"
                     >
                         <ChatBubbleIcon className="w-5 h-5" />
                         Чат с ботаником
@@ -173,7 +201,7 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
                             <button 
                                 key={type} 
                                 onClick={() => onLogCareEvent(plant.id, type)} 
-                                className="flex flex-col items-center justify-center h-full p-3 bg-accent rounded-xl hover:bg-accent/70 transition-colors"
+                                className="flex flex-col items-center justify-center h-full p-3 bg-accent rounded-xl hover:bg-accent/70 transition-colors active:scale-95"
                             >
                                 <Icon className={`w-7 h-7 mb-2 ${colorClasses[color as keyof typeof colorClasses].icon}`} />
                                 <span className={`text-sm font-semibold ${colorClasses[color as keyof typeof colorClasses].text}`}>{label}</span>
@@ -229,7 +257,7 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
                         )}
                     </div>
                 </div>
-                
+
                 {/* Last Care Dates */}
                 <div className="mb-6">
                      <h2 className="text-lg font-semibold mb-3">Последний уход</h2>
@@ -260,6 +288,66 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
                      </div>
                 </div>
 
+                {/* Edit Modal */}
+                {isEditModalOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={() => setIsEditModalOpen(false)}>
+                        <div className="bg-card rounded-2xl w-full max-w-lg p-6 animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold">Редактировать растение</h2>
+                                <button onClick={() => setIsEditModalOpen(false)} className="p-1 rounded-full hover:bg-accent -mr-2 -mt-2">
+                                    <CloseIcon className="w-5 h-5"/>
+                                </button>
+                            </div>
+                            
+                            <div className="space-y-4">
+                                 <div>
+                                    <label className="block text-sm font-medium text-foreground/80 mb-1">Название</label>
+                                    <input type="text" value={editablePlant.name} onChange={(e) => setEditablePlant({...editablePlant, name: e.target.value})} className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
+                                </div>
+                                <div>
+                                   <label className="block text-sm font-medium text-foreground/80 mb-1">Локация</label>
+                                   <select value={editablePlant.location} onChange={(e) => setEditablePlant({...editablePlant, location: e.target.value as PlantLocation})} className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary capitalize">
+                                       {PLANT_LOCATIONS_OPTIONS.map(loc => <option key={loc} value={loc}>{PLANT_LOCATION_RUSSIAN[loc]}</option>)}
+                                   </select>
+                                   {editablePlant.location === PlantLocation.OTHER && (
+                                       <input 
+                                           type="text" 
+                                           value={editablePlant.customLocation || ''} 
+                                           onChange={(e) => setEditablePlant({...editablePlant, customLocation: e.target.value})}
+                                           placeholder="Укажите местоположение"
+                                           required
+                                           className="w-full bg-accent border-none rounded-lg px-3 py-2 mt-2 focus:ring-2 focus:ring-primary"
+                                       />
+                                   )}
+                                </div>
+                                <div>
+                                   <label className="block text-sm font-medium text-foreground/80 mb-1">Тип</label>
+                                   <select value={editablePlant.type} onChange={(e) => setEditablePlant({...editablePlant, type: e.target.value as PlantType})} className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary capitalize">
+                                       {PLANT_TYPES_OPTIONS.map(pt => <option key={pt} value={pt}>{PLANT_TYPE_RUSSIAN[pt]}</option>)}
+                                   </select>
+                                   {editablePlant.type === PlantType.OTHER && (
+                                       <input 
+                                           type="text" 
+                                           value={editablePlant.customType || ''} 
+                                           onChange={(e) => setEditablePlant({...editablePlant, customType: e.target.value})}
+                                           placeholder="Укажите тип растения"
+                                           required
+                                           className="w-full bg-accent border-none rounded-lg px-3 py-2 mt-2 focus:ring-2 focus:ring-primary"
+                                       />
+                                   )}
+                                </div>
+                            </div>
+
+                            <div className="mt-6 flex justify-end gap-3">
+                                <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 rounded-full text-sm font-semibold hover:bg-accent transition-colors">Отмена</button>
+                                <button onClick={handleSaveChanges} className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2">
+                                    <SaveIcon className="w-4 h-4"/> Сохранить
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
                 {/* Delete Button Section */}
                 <div className="mt-8 border-t border-red-500/20 pt-6">
                     <button
@@ -279,65 +367,8 @@ const PlantDetailScreen: React.FC<PlantDetailScreenProps> = ({ plant, onBack, on
             {isChatOpen && (
                 <AiChatModal plant={plant} onClose={() => setIsChatOpen(false)} />
             )}
-
-            {/* Edit Modal/Form */}
-            {isEditModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={() => setIsEditModalOpen(false)}>
-                    <div className="bg-card rounded-2xl w-full max-w-lg p-6 animate-fade-in-up" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold">Редактировать растение</h2>
-                            <button onClick={() => setIsEditModalOpen(false)} className="p-1 rounded-full hover:bg-accent -mr-2 -mt-2">
-                                <CloseIcon className="w-5 h-5"/>
-                            </button>
-                        </div>
-                        
-                        <div className="space-y-4">
-                             <div>
-                                <label className="block text-sm font-medium text-foreground/80 mb-1">Название</label>
-                                <input type="text" value={editablePlant.name} onChange={(e) => setEditablePlant({...editablePlant, name: e.target.value})} className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
-                            </div>
-                            <div>
-                               <label className="block text-sm font-medium text-foreground/80 mb-1">Локация</label>
-                               <select value={editablePlant.location} onChange={(e) => setEditablePlant({...editablePlant, location: e.target.value as PlantLocation})} className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary capitalize">
-                                   {PLANT_LOCATIONS_OPTIONS.map(loc => <option key={loc} value={loc}>{PLANT_LOCATION_RUSSIAN[loc]}</option>)}
-                               </select>
-                               {editablePlant.location === PlantLocation.OTHER && (
-                                   <input 
-                                       type="text" 
-                                       value={editablePlant.customLocation || ''} 
-                                       onChange={(e) => setEditablePlant({...editablePlant, customLocation: e.target.value})}
-                                       placeholder="Укажите местоположение"
-                                       required
-                                       className="w-full bg-accent border-none rounded-lg px-3 py-2 mt-2 focus:ring-2 focus:ring-primary"
-                                   />
-                               )}
-                            </div>
-                            <div>
-                               <label className="block text-sm font-medium text-foreground/80 mb-1">Тип</label>
-                               <select value={editablePlant.type} onChange={(e) => setEditablePlant({...editablePlant, type: e.target.value as PlantType})} className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary capitalize">
-                                   {PLANT_TYPES_OPTIONS.map(pt => <option key={pt} value={pt}>{PLANT_TYPE_RUSSIAN[pt]}</option>)}
-                               </select>
-                               {editablePlant.type === PlantType.OTHER && (
-                                   <input 
-                                       type="text" 
-                                       value={editablePlant.customType || ''} 
-                                       onChange={(e) => setEditablePlant({...editablePlant, customType: e.target.value})}
-                                       placeholder="Укажите тип растения"
-                                       required
-                                       className="w-full bg-accent border-none rounded-lg px-3 py-2 mt-2 focus:ring-2 focus:ring-primary"
-                                   />
-                               )}
-                            </div>
-                        </div>
-
-                        <div className="mt-6 flex justify-end gap-3">
-                            <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 rounded-full text-sm font-semibold hover:bg-accent transition-colors">Отмена</button>
-                            <button onClick={handleSaveChanges} className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2">
-                                <SaveIcon className="w-4 h-4"/> Сохранить
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {isTimelapseOpen && (
+                <TimelapseModal plantId={plant.id} onClose={() => setIsTimelapseOpen(false)} />
             )}
             
             {/* Delete Confirmation Modal */}

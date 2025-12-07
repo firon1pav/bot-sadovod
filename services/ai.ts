@@ -1,78 +1,57 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { api } from './api';
+import { Plant } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+/**
+ * Helper to convert various image inputs (File, Blob URL, Base64) into FormData
+ * ready for backend upload.
+ */
+const createFormData = async (imageInput: string | File): Promise<FormData> => {
+    const formData = new FormData();
+    let blob: Blob;
 
-const MODEL_NAME = 'gemini-2.5-flash';
+    try {
+        if (imageInput instanceof File) {
+            blob = imageInput;
+        } else if (typeof imageInput === 'string') {
+            // Check if it's a Blob URL (preview) or HTTP URL
+            const response = await fetch(imageInput);
+            blob = await response.blob();
+        } else {
+            throw new Error("Неизвестный формат изображения");
+        }
 
-// Helper to parse Data URL to base64 and mimeType
-const parseDataUrl = (dataUrl: string) => {
-    const matches = dataUrl.match(/^data:(.+);base64,(.+)$/);
-    if (!matches || matches.length < 3) {
-        throw new Error("Invalid data URL");
+        // 'photo' matches the upload.single('photo') middleware on backend
+        formData.append('photo', blob, 'image.jpg');
+    } catch (e) {
+        console.error("Error processing image for AI:", e);
+        throw new Error("Не удалось обработать изображение для отправки.");
     }
-    return { mimeType: matches[1], data: matches[2] };
+
+    return formData;
 };
 
-export const identifyPlant = async (imageBase64: string) => {
-    const { mimeType, data } = parseDataUrl(imageBase64);
-
-    const response = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: {
-            parts: [
-                { inlineData: { mimeType, data } },
-                { text: "Identify this plant. Provide the name, type (must be one of: FOLIAGE, FLOWERING, SUCCULENT, PALM, OTHER), suggested watering frequency in days, and a short description." }
-            ]
-        },
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    name: { type: Type.STRING },
-                    type: { type: Type.STRING },
-                    wateringFrequencyDays: { type: Type.NUMBER },
-                    description: { type: Type.STRING }
-                },
-                required: ["name", "type", "wateringFrequencyDays"]
-            }
-        }
-    });
-
-    return JSON.parse(response.text || "{}");
+/**
+ * Sends image to backend for plant identification.
+ */
+export const identifyPlant = async (imageInput: string | File) => {
+    const formData = await createFormData(imageInput);
+    // Calls POST /api/ai/identify
+    return await api.identifyPlant(formData);
 };
 
-export const diagnosePlant = async (imageBase64: string) => {
-    const { mimeType, data } = parseDataUrl(imageBase64);
-
-    const response = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: {
-            parts: [
-                { inlineData: { mimeType, data } },
-                { text: "You are an expert plant pathologist. Analyze this image for any signs of pests, diseases, or care issues (overwatering, sunburn, etc.). Provide a diagnosis and a step-by-step treatment plan. Keep it concise but helpful." }
-            ]
-        }
-    });
-
-    return response.text;
+/**
+ * Sends image to backend for plant pathology diagnosis.
+ */
+export const diagnosePlant = async (imageInput: string | File) => {
+    const formData = await createFormData(imageInput);
+    // Calls POST /api/ai/diagnose
+    return await api.diagnosePlant(formData);
 };
 
-export const chatWithPlantExpert = async (message: string, plantContext: any) => {
-    const systemInstruction = `You are a helpful and friendly botanist assistant. 
-    You are helping a user with their plant. Here is the context about the plant:
-    ${JSON.stringify(plantContext)}
-    
-    Answer questions specifically about this plant. Be concise and encouraging.`;
-
-    const response = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: message,
-        config: {
-            systemInstruction: systemInstruction,
-        }
-    });
-
-    return response.text;
+/**
+ * Sends message to backend for chat.
+ */
+export const chatWithPlantExpert = async (message: string, plant: Plant) => {
+    return await api.chatWithPlant(message, plant.id, []); 
 };

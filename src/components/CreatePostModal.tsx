@@ -1,3 +1,4 @@
+
 import React, { useState, FormEvent, useRef, useEffect } from 'react';
 import { User } from '../types';
 import { CloseIcon, UploadIcon, SaveIcon } from './icons';
@@ -27,6 +28,15 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onCr
     }
   }, [isOpen]);
 
+  // Memory Leak Fix
+  useEffect(() => {
+      return () => {
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
+      };
+  }, [photoUrl]);
+
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const originalFile = e.target.files[0];
@@ -34,10 +44,18 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onCr
       try {
           const compressedFile = await compressImage(originalFile);
           setPhotoFile(compressedFile);
+          
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
           setPhotoUrl(URL.createObjectURL(compressedFile));
       } catch (err) {
           console.error("Compression failed", err);
           setPhotoFile(originalFile);
+          
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
           setPhotoUrl(URL.createObjectURL(originalFile));
       } finally {
           setIsCompressing(false);
@@ -46,6 +64,9 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onCr
   };
   
   const handleRemovePhoto = () => {
+    if (photoUrl && photoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(photoUrl);
+    }
     setPhotoUrl(null);
     setPhotoFile(null);
     if(fileInputRef.current) {

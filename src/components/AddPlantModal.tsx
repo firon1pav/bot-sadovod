@@ -1,34 +1,39 @@
+
 import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import { Plant, PlantLocation, PlantType } from '../types';
 import { PLANT_LOCATIONS_OPTIONS, PLANT_TYPES_OPTIONS } from '../constants';
-import { PLANT_LOCATION_RUSSIAN, PLANT_TYPE_RUSSIAN, compressImage } from '../utils';
-import { UploadIcon, SparklesIcon } from './icons';
+import { PLANT_LOCATION_RUSSIAN, PLANT_TYPE_RUSSIAN, compressImage, getTodayString } from '../utils';
+import { UploadIcon, SparklesIcon, LockIcon } from './icons';
 import { identifyPlant } from '../services/ai';
-import { api } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 interface AddPlantModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddPlant: (plant: any) => void; 
+  // Handler expects FormData to pass to hook -> API
+  onAddPlant: (plantFormData: any) => void; 
+  onAiActionSuccess?: () => void;
 }
 
-const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPlant }) => {
+const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPlant, onAiActionSuccess }) => {
   const [name, setName] = useState('');
   const [location, setLocation] = useState<PlantLocation>(PlantLocation.HOME);
   const [customLocation, setCustomLocation] = useState('');
   const [type, setType] = useState<PlantType>(PlantType.FOLIAGE);
   const [customType, setCustomType] = useState('');
-  const [lastWateredAt, setLastWateredAt] = useState(new Date().toISOString().split('T')[0]);
+  const [lastWateredAt, setLastWateredAt] = useState(getTodayString());
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [wateringFrequency, setWateringFrequency] = useState<number | undefined>(undefined);
+  const [wateringFrequency, setWateringFrequency] = useState<number | string>('');
   
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!isOpen) {
@@ -37,19 +42,29 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
         setCustomLocation('');
         setType(PlantType.FOLIAGE);
         setCustomType('');
-        setLastWateredAt(new Date().toISOString().split('T')[0]);
+        setLastWateredAt(getTodayString());
         setPhotoUrl(null);
         setPhotoFile(null);
-        setWateringFrequency(undefined);
+        setWateringFrequency('');
         setIsIdentifying(false);
         setAiError(null);
         setIsSubmitting(false);
         setIsCompressing(false);
+        setLimitReached(false);
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
     }
   }, [isOpen]);
+
+  // Memory Leak Fix: Revoke Object URL when component unmounts or photoUrl changes
+  useEffect(() => {
+      return () => {
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
+      };
+  }, [photoUrl]);
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -60,13 +75,21 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
           const compressedFile = await compressImage(originalFile);
           setPhotoFile(compressedFile);
           
-          // Create preview URL
+          // Cleanup old blob if it exists before setting new one
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
+          
           setPhotoUrl(URL.createObjectURL(compressedFile));
           setAiError(null);
+          setLimitReached(false);
       } catch (err) {
           console.error("Compression Error", err);
-          // Fallback to original
           setPhotoFile(originalFile);
+          
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
           setPhotoUrl(URL.createObjectURL(originalFile));
       } finally {
           setIsCompressing(false);
@@ -79,12 +102,11 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
       
       setIsIdentifying(true);
       setAiError(null);
+      setLimitReached(false);
       
       try {
-          // Pass the file object if available, otherwise photoUrl (base64)
-          // Note: identifyPlant service handles File object correctly now
+          // Pass the file if available, otherwise the URL (which createFormData will fetch)
           const result = await identifyPlant(photoFile || photoUrl!);
-          console.log("AI Result:", result);
           
           if (result.name) setName(result.name);
           
@@ -102,48 +124,54 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
               setWateringFrequency(result.wateringFrequencyDays);
           }
 
-      } catch (error) {
+          if (onAiActionSuccess) {
+              onAiActionSuccess();
+          }
+
+      } catch (error: any) {
           console.error("AI Identification failed", error);
-          setAiError("Не удалось определить растение. Попробуйте другое фото.");
+          const msg = error.message || "";
+          if (msg.includes("Limit")) {
+              setLimitReached(true);
+          } else {
+              setAiError(msg || "Не удалось определить растение.");
+          }
       } finally {
           setIsIdentifying(false);
       }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (isCompressing) return;
     setIsSubmitting(true);
 
-    try {
-        const formData = new FormData();
-        formData.append('name', name);
-        formData.append('location', location);
-        if (customLocation) formData.append('customLocation', customLocation);
-        formData.append('type', type);
-        if (customType) formData.append('customType', customType);
-        formData.append('lastWateredAt', new Date(lastWateredAt).toISOString());
-        formData.append('wateringFrequencyDays', (wateringFrequency || 7).toString());
-        if (photoFile) {
-            formData.append('photo', photoFile);
-        }
-
-        const newPlant = await api.addPlant(formData);
-        onAddPlant(newPlant); 
-        onClose();
-    } catch (error) {
-        console.error("Failed to add plant", error);
-        setAiError("Ошибка при сохранении");
-    } finally {
-        setIsSubmitting(false);
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('location', location);
+    if (customLocation) formData.append('customLocation', customLocation);
+    formData.append('type', type);
+    if (customType) formData.append('customType', customType);
+    formData.append('lastWateredAt', new Date(lastWateredAt).toISOString());
+    
+    const freq = Number(wateringFrequency);
+    formData.append('wateringFrequencyDays', (freq > 0 ? freq : 7).toString());
+    
+    if (photoFile) {
+        formData.append('photo', photoFile);
     }
+
+    // Call Hook directly with FormData. Hook will call API.
+    onAddPlant(formData);
+    onClose();
+    setIsSubmitting(false);
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-card rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold mb-4">Добавить новое растение</h2>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
@@ -166,7 +194,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
                         </div>
                     )}
                 </button>
-                {(photoUrl || photoFile) && !isIdentifying && !isCompressing && (
+                {(photoUrl || photoFile) && !isIdentifying && !isCompressing && !limitReached && (
                     <button
                         type="button"
                         onClick={handleIdentify}
@@ -179,11 +207,16 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
                  {isIdentifying && (
                      <div className="text-xs text-primary animate-pulse">Изучаю растение...</div>
                  )}
+                 {limitReached && (
+                     <div className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-full text-xs font-bold">
+                         <LockIcon className="w-3 h-3" />
+                         Лимит AI (5/5) исчерпан
+                     </div>
+                 )}
                  {aiError && (
                      <div className="text-xs text-red-500 text-center">{aiError}</div>
                  )}
             </div>
-            {/* Form Fields */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-foreground/80 mb-1">Название растения</label>
               <input type="text" id="name" value={name} onChange={(e) => setName(e.target.value)} required className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
@@ -206,9 +239,23 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
                   <input type="text" value={customType} onChange={(e) => setCustomType(e.target.value)} placeholder="Укажите тип растения" required className="mt-2 w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
               )}
             </div>
-            <div>
-              <label htmlFor="lastWatered" className="block text-sm font-medium text-foreground/80 mb-1">Последний полив</label>
-              <input type="date" id="lastWatered" value={lastWateredAt} onChange={(e) => setLastWateredAt(e.target.value)} required className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
+            <div className="flex gap-4">
+                <div className="flex-1">
+                    <label htmlFor="lastWatered" className="block text-sm font-medium text-foreground/80 mb-1">Последний полив</label>
+                    <input type="date" id="lastWatered" value={lastWateredAt} onChange={(e) => setLastWateredAt(e.target.value)} required className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
+                </div>
+                <div className="flex-1">
+                    <label htmlFor="frequency" className="block text-sm font-medium text-foreground/80 mb-1">Полив (дней)</label>
+                    <input 
+                        type="number" 
+                        id="frequency" 
+                        value={wateringFrequency} 
+                        onChange={(e) => setWateringFrequency(e.target.value)} 
+                        placeholder="7" 
+                        min="1"
+                        className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"
+                    />
+                </div>
             </div>
           </div>
           <div className="mt-6 flex justify-end gap-3">

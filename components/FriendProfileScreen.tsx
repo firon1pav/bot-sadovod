@@ -1,17 +1,18 @@
+
 import React, { useState } from 'react';
-import { User, Plant, LevelInfo } from '../types';
+import { User, Plant } from '../types';
 import { BackIcon, CakeIcon, ProfileIcon as GenderIcon, TrashIcon, PaperAirplaneIcon, AtSymbolIcon } from './icons';
 import PlantCard from './PlantCard';
+import { XP_LEVELS } from '../constants';
 
 interface FriendProfileScreenProps {
     friend: User;
     plants: Plant[];
-    levelInfo: LevelInfo; // Note: This should ideally be the friend's level info
     onBack: () => void;
     onRemoveFriend: (friendId: string) => void;
 }
 
-const FriendProfileScreen: React.FC<FriendProfileScreenProps> = ({ friend, plants, levelInfo, onBack, onRemoveFriend }) => {
+const FriendProfileScreen: React.FC<FriendProfileScreenProps> = ({ friend, plants, onBack, onRemoveFriend }) => {
     const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
     
     const genderMap = {
@@ -23,6 +24,10 @@ const FriendProfileScreen: React.FC<FriendProfileScreenProps> = ({ friend, plant
         onRemoveFriend(friend.id);
         setIsConfirmingRemove(false);
     };
+
+    // Calculate level info locally for the friend
+    const currentLevel = friend.level || 1;
+    const levelName = XP_LEVELS.find(l => l.level === currentLevel)?.name || `Уровень ${currentLevel}`;
 
     return (
         <div className="animate-fade-in">
@@ -51,7 +56,7 @@ const FriendProfileScreen: React.FC<FriendProfileScreenProps> = ({ friend, plant
                 {/* User Info */}
                 <div className="flex flex-col items-center mb-6">
                     <img src={friend.photoUrl} alt={`Аватар ${friend.name}`} className="w-24 h-24 rounded-full object-cover mb-3 border-4 border-primary/50" />
-                    <p className="text-sm text-foreground/70">{levelInfo.levelName} - Уровень {levelInfo.level}</p>
+                    <p className="text-sm text-foreground/70">{levelName} - Уровень {currentLevel}</p>
                 </div>
 
                  <div className="bg-card border border-accent rounded-lg p-4 mb-6 space-y-4">

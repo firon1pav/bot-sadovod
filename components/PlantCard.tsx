@@ -1,9 +1,8 @@
 
-
 import React, { useMemo, useState } from 'react';
 import { Plant, CareType, PlantLocation } from '../types';
 import { WaterDropIcon, LocationIcon, ScissorsIcon, SpadeIcon, FertilizerIcon } from './icons';
-import { PLANT_LOCATION_RUSSIAN } from '../utils';
+import { PLANT_LOCATION_RUSSIAN, triggerHaptic } from '../utils';
 
 interface PlantCardProps {
   plant: Plant;
@@ -21,6 +20,8 @@ const CARE_ACTION_DETAILS: Record<string, { Icon: React.FC<any>, name: string }>
 
 const PlantCard: React.FC<PlantCardProps> = ({ plant, onLogCare, onSelect, isReadOnly = false }) => {
   const [activeAnimation, setActiveAnimation] = useState<CareType | null>(null);
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const [imageSrc, setImageSrc] = useState(plant.photoUrl);
   
   const daysSinceWatered = (new Date().getTime() - new Date(plant.lastWateredAt).getTime()) / (1000 * 3600 * 24);
   
@@ -33,12 +34,18 @@ const PlantCard: React.FC<PlantCardProps> = ({ plant, onLogCare, onSelect, isRea
 
   const handleCare = (e: React.MouseEvent, type: CareType) => {
     e.stopPropagation();
+    triggerHaptic('medium');
     onLogCare(plant.id, type);
 
     setActiveAnimation(type);
     
     // Different durations or logic could be applied here
     setTimeout(() => setActiveAnimation(null), 1000);
+  };
+
+  const handleImageError = () => {
+      // Fallback to a placeholder if the image fails to load
+      setImageSrc('https://placehold.co/400?text=Plant');
   };
 
   const upcomingActions = useMemo(() => {
@@ -86,8 +93,14 @@ const PlantCard: React.FC<PlantCardProps> = ({ plant, onLogCare, onSelect, isRea
       className={`relative bg-card border border-accent rounded-2xl shadow-sm overflow-hidden flex flex-col transition-transform duration-300 ${!isReadOnly ? 'cursor-pointer' : ''} ${activeAnimation === CareType.REPOT ? 'animate-wiggle' : ''} ${activeAnimation === CareType.TRIM ? 'animate-pop' : ''}`}
       onClick={!isReadOnly ? () => onSelect(plant) : undefined}
     >
-      <div className="relative h-32 w-full group">
-         <img src={plant.photoUrl} alt={plant.name} className="w-full h-full object-cover" />
+      <div className={`relative h-32 w-full group ${!isImageLoaded ? 'bg-accent/30 animate-pulse' : ''}`}>
+         <img 
+            src={imageSrc} 
+            alt={plant.name} 
+            className={`w-full h-full object-cover transition-opacity duration-500 ${isImageLoaded ? 'opacity-100' : 'opacity-0'}`} 
+            onLoad={() => setIsImageLoaded(true)}
+            onError={handleImageError}
+         />
          
          {/* Animation Overlays */}
          {activeAnimation === CareType.WATER && (

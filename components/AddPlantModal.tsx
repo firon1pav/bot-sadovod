@@ -1,16 +1,16 @@
 
-
 import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import { Plant, PlantLocation, PlantType } from '../types';
 import { PLANT_LOCATIONS_OPTIONS, PLANT_TYPES_OPTIONS } from '../constants';
-import { PLANT_LOCATION_RUSSIAN, PLANT_TYPE_RUSSIAN } from '../utils';
+import { PLANT_LOCATION_RUSSIAN, PLANT_TYPE_RUSSIAN, compressImage, getTodayString } from '../utils';
 import { UploadIcon, SparklesIcon } from './icons';
 import { identifyPlant } from '../services/ai';
 
 interface AddPlantModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddPlant: (plant: Omit<Plant, 'id' | 'createdAt'>) => void;
+  // Handler expects FormData to pass to hook -> API
+  onAddPlant: (plantFormData: any) => void; 
 }
 
 const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPlant }) => {
@@ -19,15 +19,17 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
   const [customLocation, setCustomLocation] = useState('');
   const [type, setType] = useState<PlantType>(PlantType.FOLIAGE);
   const [customType, setCustomType] = useState('');
-  const [lastWateredAt, setLastWateredAt] = useState(new Date().toISOString().split('T')[0]);
+  const [lastWateredAt, setLastWateredAt] = useState(getTodayString());
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [wateringFrequency, setWateringFrequency] = useState<number | undefined>(undefined);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [wateringFrequency, setWateringFrequency] = useState<number | string>('');
   
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
 
   useEffect(() => {
     if (!isOpen) {
@@ -36,38 +38,68 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
         setCustomLocation('');
         setType(PlantType.FOLIAGE);
         setCustomType('');
-        setLastWateredAt(new Date().toISOString().split('T')[0]);
+        setLastWateredAt(getTodayString());
         setPhotoUrl(null);
-        setWateringFrequency(undefined);
+        setPhotoFile(null);
+        setWateringFrequency('');
         setIsIdentifying(false);
         setAiError(null);
+        setIsSubmitting(false);
+        setIsCompressing(false);
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
     }
   }, [isOpen]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoUrl(reader.result as string);
-        setAiError(null);
+  // Memory Leak Fix: Revoke Object URL when component unmounts or photoUrl changes
+  useEffect(() => {
+      return () => {
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
       };
-      reader.readAsDataURL(file);
+  }, [photoUrl]);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const originalFile = e.target.files[0];
+      
+      setIsCompressing(true);
+      try {
+          const compressedFile = await compressImage(originalFile);
+          setPhotoFile(compressedFile);
+          
+          // Cleanup old blob if it exists before setting new one
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
+          
+          setPhotoUrl(URL.createObjectURL(compressedFile));
+          setAiError(null);
+      } catch (err) {
+          console.error("Compression Error", err);
+          setPhotoFile(originalFile);
+          
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
+          setPhotoUrl(URL.createObjectURL(originalFile));
+      } finally {
+          setIsCompressing(false);
+      }
     }
   };
 
   const handleIdentify = async () => {
-      if (!photoUrl) return;
+      if (!photoFile && !photoUrl) return;
       
       setIsIdentifying(true);
       setAiError(null);
       
       try {
-          const result = await identifyPlant(photoUrl);
-          console.log("AI Result:", result);
+          // Pass the file if available, otherwise the URL (which createFormData will fetch)
+          const result = await identifyPlant(photoFile || photoUrl!);
           
           if (result.name) setName(result.name);
           
@@ -85,9 +117,9 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
               setWateringFrequency(result.wateringFrequencyDays);
           }
 
-      } catch (error) {
+      } catch (error: any) {
           console.error("AI Identification failed", error);
-          setAiError("Не удалось определить растение. Попробуйте другое фото.");
+          setAiError(error.message || "Не удалось определить растение.");
       } finally {
           setIsIdentifying(false);
       }
@@ -95,25 +127,35 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const newPlant: Omit<Plant, 'id' | 'createdAt'> = {
-      userId: 'user1',
-      name,
-      photoUrl: photoUrl || `https://picsum.photos/seed/${name.replace(/\s/g, '')}/400/400`,
-      location,
-      customLocation: location === PlantLocation.OTHER ? customLocation : undefined,
-      type,
-      customType: type === PlantType.OTHER ? customType : undefined,
-      lastWateredAt: new Date(lastWateredAt),
-      wateringFrequencyDays: wateringFrequency || 0, // MockData hook calculates if 0/undefined, but we pass overrides now
-    };
-    onAddPlant(newPlant);
+    if (isCompressing) return;
+    setIsSubmitting(true);
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('location', location);
+    if (customLocation) formData.append('customLocation', customLocation);
+    formData.append('type', type);
+    if (customType) formData.append('customType', customType);
+    formData.append('lastWateredAt', new Date(lastWateredAt).toISOString());
+    
+    const freq = Number(wateringFrequency);
+    formData.append('wateringFrequencyDays', (freq > 0 ? freq : 7).toString());
+    
+    if (photoFile) {
+        formData.append('photo', photoFile);
+    }
+
+    // Call Hook directly with FormData. Hook will call API.
+    onAddPlant(formData);
+    onClose();
+    setIsSubmitting(false);
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-card rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold mb-4">Добавить новое растение</h2>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
@@ -122,9 +164,12 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
                 <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="relative w-24 h-24 rounded-full bg-accent flex items-center justify-center text-foreground/50 hover:bg-accent/80 transition-colors"
+                    disabled={isCompressing}
+                    className="relative w-24 h-24 rounded-full bg-accent flex items-center justify-center text-foreground/50 hover:bg-accent/80 transition-colors disabled:opacity-50"
                 >
-                    {photoUrl ? (
+                    {isCompressing ? (
+                        <div className="w-6 h-6 border-2 border-foreground/50 border-t-transparent rounded-full animate-spin"></div>
+                    ) : photoUrl ? (
                         <img src={photoUrl} alt="Превью" className="w-full h-full rounded-full object-cover"/>
                     ) : (
                         <div className="text-center">
@@ -133,14 +178,14 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
                         </div>
                     )}
                 </button>
-                {photoUrl && !isIdentifying && (
+                {(photoUrl || photoFile) && !isIdentifying && !isCompressing && (
                     <button
                         type="button"
                         onClick={handleIdentify}
                         className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-full text-xs font-bold hover:opacity-90 transition-opacity"
                     >
                         <SparklesIcon className="w-4 h-4" />
-                        Определить по фото
+                        Определить по фото (AI)
                     </button>
                 )}
                  {isIdentifying && (
@@ -172,14 +217,30 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onAddPla
                   <input type="text" value={customType} onChange={(e) => setCustomType(e.target.value)} placeholder="Укажите тип растения" required className="mt-2 w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
               )}
             </div>
-            <div>
-              <label htmlFor="lastWatered" className="block text-sm font-medium text-foreground/80 mb-1">Последний полив</label>
-              <input type="date" id="lastWatered" value={lastWateredAt} onChange={(e) => setLastWateredAt(e.target.value)} required className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
+            <div className="flex gap-4">
+                <div className="flex-1">
+                    <label htmlFor="lastWatered" className="block text-sm font-medium text-foreground/80 mb-1">Последний полив</label>
+                    <input type="date" id="lastWatered" value={lastWateredAt} onChange={(e) => setLastWateredAt(e.target.value)} required className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"/>
+                </div>
+                <div className="flex-1">
+                    <label htmlFor="frequency" className="block text-sm font-medium text-foreground/80 mb-1">Полив (дней)</label>
+                    <input 
+                        type="number" 
+                        id="frequency" 
+                        value={wateringFrequency} 
+                        onChange={(e) => setWateringFrequency(e.target.value)} 
+                        placeholder="7" 
+                        min="1"
+                        className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"
+                    />
+                </div>
             </div>
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-full text-sm font-semibold hover:bg-accent transition-colors">Отмена</button>
-            <button type="submit" className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors">Добавить</button>
+            <button type="submit" disabled={isSubmitting || isCompressing} className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
+                {isSubmitting ? 'Сохранение...' : 'Добавить'}
+            </button>
           </div>
         </form>
       </div>

@@ -1,5 +1,7 @@
 {
   "name": "BotGardener: Plants Care Tracker",
   "description": "A Telegram Mini App to help you track the care of your plants. Log watering, set reminders, and watch your virtual garden grow with gamification features like XP, levels, and achievements.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }

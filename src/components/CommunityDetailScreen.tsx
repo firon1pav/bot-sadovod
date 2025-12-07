@@ -5,6 +5,23 @@ import { BackIcon, MoreHorizontalIcon, PlusIcon, CloseIcon, FlagIcon } from './i
 import CreatePostModal from './CreatePostModal';
 import EditPostModal from './EditPostModal';
 import CommentModal from './CommentModal';
+import { triggerHaptic } from '../utils';
+
+// --- Skeleton Image Component ---
+const SkeletonImage = ({ src, alt, className, ...props }: any) => {
+    const [loaded, setLoaded] = useState(false);
+    return (
+        <div className={`relative overflow-hidden ${className} ${!loaded ? 'bg-accent/30 animate-pulse' : ''}`}>
+            <img
+                src={src}
+                alt={alt}
+                {...props}
+                className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                onLoad={() => setLoaded(true)}
+            />
+        </div>
+    );
+};
 
 // --- Report Post Modal Component ---
 interface ReportPostModalProps {
@@ -125,11 +142,12 @@ interface CommunityDetailScreenProps {
   likedPostIds: Set<string>;
   toggleLikePost: (postId: string) => void;
   addNotification: (notification: Omit<Notification, 'id'>) => void;
+  fetchCommunityPosts: (communityId: string) => void;
 }
 
 const CommunityDetailScreen: React.FC<CommunityDetailScreenProps> = ({
   community, posts, comments, currentUser, onBack, onLeaveCommunity, onJoinCommunity,
-  onAddPost, onUpdatePost, onDeletePost, onAddComment, onFetchComments, timeAgo, likedPostIds, toggleLikePost, addNotification
+  onAddPost, onUpdatePost, onDeletePost, onAddComment, onFetchComments, timeAgo, likedPostIds, toggleLikePost, addNotification, fetchCommunityPosts
 }) => {
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<CommunityPost | null>(null);
@@ -210,7 +228,7 @@ const CommunityDetailScreen: React.FC<CommunityDetailScreenProps> = ({
         <button onClick={onBack} className="p-2 rounded-full hover:bg-accent -ml-2">
           <BackIcon className="w-6 h-6" />
         </button>
-        <img src={community.photoUrl.replace('&w=800&h=400', '&w=100&h=100')} alt={community.name} className="w-10 h-10 rounded-lg object-cover" />
+        <SkeletonImage src={community.photoUrl.replace('&w=800&h=400', '&w=100&h=100')} alt={community.name} className="w-10 h-10 rounded-lg flex-shrink-0" />
         <div className="flex-1 overflow-hidden">
             <h1 className="text-lg font-bold truncate">{community.name}</h1>
             <p className="text-xs text-foreground/60">👥 {community.memberCount.toLocaleString('ru-RU')} участников</p>
@@ -245,7 +263,7 @@ const CommunityDetailScreen: React.FC<CommunityDetailScreenProps> = ({
               {/* Post Header */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <img src={post.authorPhotoUrl} alt={post.authorName} className="w-10 h-10 rounded-full object-cover" />
+                  <SkeletonImage src={post.authorPhotoUrl} alt={post.authorName} className="w-10 h-10 rounded-full flex-shrink-0" />
                   <div>
                     <p className="font-bold">{post.authorName}</p>
                     <p className="text-xs text-foreground/60">{timeAgo(post.createdAt)}</p>
@@ -274,12 +292,15 @@ const CommunityDetailScreen: React.FC<CommunityDetailScreenProps> = ({
               </div>
               {/* Post Body */}
               <p className="mb-3 text-sm whitespace-pre-wrap">{post.text}</p>
-              {post.photoUrl && <img src={post.photoUrl} alt="Фото к посту" className="rounded-lg w-full object-cover max-h-80" />}
+              {post.photoUrl && <SkeletonImage src={post.photoUrl} alt="Фото к посту" className="rounded-lg w-full h-64 sm:h-80" />}
               {/* Post Actions */}
               <div className="flex items-center mt-3 pt-3 border-t border-accent/50 text-foreground/70">
                 <div className="flex-1 flex items-center gap-4">
                     <button
-                        onClick={() => toggleLikePost(post.id)}
+                        onClick={() => {
+                            triggerHaptic('light');
+                            toggleLikePost(post.id);
+                        }}
                         className={`flex items-center gap-2 text-sm transition-colors ${
                             likedPostIds.has(post.id) ? 'text-red-500 hover:text-red-400' : 'hover:text-primary'
                         }`}

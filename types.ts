@@ -1,3 +1,4 @@
+
 // FIX: Import React to use React.ReactNode type for Notification icon.
 import React from 'react';
 
@@ -47,6 +48,20 @@ export interface Plant {
 
   lastTrimmedAt?: Date;
   nextTrimmingDate?: Date;
+
+  // Market features
+  isForSale?: boolean;
+  price?: number;
+  currency?: string;
+  city?: string;
+  description?: string;
+  sellerTelegram?: string;
+  sellerName?: string;
+  sellerPhotoUrl?: string;
+
+  // Legacy / Additional features
+  isSwapAvailable?: boolean;
+  isGiveaway?: boolean;
 }
 
 export interface CareEvent {
@@ -58,16 +73,6 @@ export interface CareEvent {
   photoUrl?: string;
   occurredAt: Date;
   createdAt: Date;
-}
-
-export interface Stats {
-  userId: string;
-  totalWaterings: number;
-  totalFertilizes: number;
-  totalRepots: number;
-  totalTrims: number;
-  streakWater: number;
-  totalActions: number;
 }
 
 export interface LevelProgress {
@@ -112,6 +117,14 @@ export interface Friend {
     photoUrl: string;
 }
 
+export interface DailyQuest {
+    id: string;
+    title: string;
+    description: string;
+    xpReward: number;
+    isCompleted: boolean;
+}
+
 export interface User {
     id: string;
     name: string;
@@ -121,6 +134,14 @@ export interface User {
     telegramUsername?: string;
     about: string;
     friends: Friend[];
+    requestId?: string;
+    xp?: number;
+    level?: number;
+    dailyQuests?: DailyQuest[];
+    
+    // Subscription fields
+    aiRequestsCount: number;
+    isSubscribed: boolean;
 }
 
 export interface Community {
@@ -143,6 +164,7 @@ export interface CommunityPost {
     createdAt: Date;
     likes: number;
     comments: number;
+    isLiked?: boolean;
 }
 
 export interface CommunityMember {

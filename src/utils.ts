@@ -1,3 +1,4 @@
+
 import { CareType, PlantLocation, PlantType } from './types';
 // @ts-ignore
 import imageCompression from 'browser-image-compression';
@@ -51,6 +52,14 @@ export const formatDateGroup = (date: Date): string => {
     });
 };
 
+export const getTodayString = (): string => {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 export const compressImage = async (file: File): Promise<File> => {
     const options = {
         maxSizeMB: 0.5, // Target 500KB
@@ -67,5 +76,17 @@ export const compressImage = async (file: File): Promise<File> => {
     } catch (error) {
         console.error("Image compression failed, using original:", error);
         return file;
+    }
+};
+
+export const triggerHaptic = (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' | 'success' | 'warning' | 'error' = 'light') => {
+    // @ts-ignore
+    const tg = window.Telegram?.WebApp;
+    if (tg?.HapticFeedback) {
+        if (['success', 'warning', 'error'].includes(style)) {
+            tg.HapticFeedback.notificationOccurred(style);
+        } else {
+            tg.HapticFeedback.impactOccurred(style);
+        }
     }
 };

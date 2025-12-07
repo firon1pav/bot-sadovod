@@ -1,8 +1,9 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { HashRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 // @ts-ignore
 import confetti from 'canvas-confetti';
+import { differenceInCalendarDays } from 'date-fns';
 
 // Components
 import Header from './components/Header';
@@ -10,77 +11,18 @@ import Navbar from './components/Navbar';
 import PlantCard from './components/PlantCard';
 import CalendarScreen from './components/CalendarScreen';
 import ProfileScreen from './components/ProfileScreen';
+import MarketScreen from './components/MarketScreen';
 import PlantDetailScreen from './components/PlantDetailScreen';
 import AddPlantModal from './components/AddPlantModal';
-import CommunityDetailScreen from './components/CommunityDetailScreen';
 import NotificationToast from './components/NotificationToast';
 import FriendProfileScreen from './components/FriendProfileScreen';
+import AppLoader from './components/AppLoader';
 
 import { useMockData } from './hooks/useMockData';
-import { Plant, Community, CareType, Notification, User } from './types';
+import { Plant, CareType, Notification, User } from './types';
 import { PlusIcon, WaterDropIcon, FertilizerIcon, SpadeIcon, ScissorsIcon } from './components/icons';
-import { CARE_TYPE_RUSSIAN } from './utils';
-
-// --- INLINE LOADER COMPONENT (To fix import issues) ---
-const InlineLoader: React.FC = () => {
-  const [stage, setStage] = useState(0);
-  const [textIndex, setTextIndex] = useState(0);
-
-  const texts = [
-    "Сажаем семена...",
-    "Поливаем...",
-    "Ловим лучи солнца...",
-    "Распускаем листья...",
-    "Добро пожаловать в сад!"
-  ];
-
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => setStage(1), 200),
-      setTimeout(() => setStage(2), 1200),
-      setTimeout(() => setStage(3), 1800),
-    ];
-    const textInterval = setInterval(() => {
-      setTextIndex(prev => (prev < texts.length - 1 ? prev + 1 : prev));
-    }, 800);
-    return () => {
-      timers.forEach(clearTimeout);
-      clearInterval(textInterval);
-    };
-  }, []);
-
-  return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/95 backdrop-blur-md">
-      <div className="relative w-48 h-48 mb-8">
-        <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
-          <path d="M20 90 Q50 95 80 90" stroke="#8B4513" strokeWidth="3" fill="none" strokeLinecap="round" className="animate-fade-in" />
-          <path d="M45 90 Q50 85 55 90" fill="#5D4037" className="animate-fade-in" />
-          {stage >= 1 && (
-            <path d="M50 90 C50 80 45 60 50 40" stroke="#22C55E" strokeWidth="4" fill="none" strokeLinecap="round" className="animate-grow-stem origin-bottom" style={{ strokeDasharray: 100 }} />
-          )}
-          {stage >= 2 && (
-            <g className="animate-leaf-out origin-center" style={{ transformBox: 'fill-box' }}>
-              <path d="M50 60 Q30 50 40 70" fill="#4ADE80" stroke="#16A34A" strokeWidth="1" />
-              <path d="M50 50 Q70 40 60 60" fill="#4ADE80" stroke="#16A34A" strokeWidth="1" />
-            </g>
-          )}
-          {stage >= 3 && (
-            <g className="animate-bloom origin-center" style={{ transformBox: 'fill-box', transformOrigin: '50px 40px' }}>
-              <circle cx="50" cy="40" r="12" fill="#F472B6" />
-              <circle cx="50" cy="40" r="6" fill="#FCD34D" />
-              {[0, 60, 120, 180, 240, 300].map((deg, i) => (
-                <ellipse key={i} cx="50" cy="40" rx="6" ry="14" fill="#EC4899" transform={`rotate(${deg} 50 40) translate(0 -10)`} opacity="0.8" />
-              ))}
-            </g>
-          )}
-        </svg>
-      </div>
-      <p className="text-lg font-medium text-primary animate-pulse transition-all duration-500 min-h-[1.5rem] text-center px-4">
-        {texts[textIndex]}
-      </p>
-    </div>
-  );
-};
+import { CARE_TYPE_RUSSIAN, triggerHaptic } from './utils';
+import { api } from './services/api';
 
 // --- Route Wrappers ---
 
@@ -105,67 +47,36 @@ const PlantDetailRoute = ({ plants, onUpdatePlant, onLogCareEvent, onDeletePlant
     );
 };
 
-const CommunityDetailRoute = ({ 
-    communities, communityPosts, comments, user, leaveCommunity, joinCommunity, 
-    addPost, updatePost, deletePost, addComment, fetchComments, likedPostIds, toggleLikePost, 
-    addNotification, timeAgo, fetchCommunityPosts 
-}: any) => {
+const FriendProfileRoute = ({ getUser, getFriendPlants, removeFriend }: any) => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const community = communities.find((c: Community) => c.id === id);
-
-    useEffect(() => {
-        if (id) {
-            fetchCommunityPosts(id);
-        }
-    }, [id, fetchCommunityPosts]);
-
-    if (!community) return <Navigate to="/profile" replace />;
-
-    return (
-        <CommunityDetailScreen
-            community={community}
-            posts={communityPosts.filter((p: any) => p.communityId === community.id)}
-            comments={comments}
-            currentUser={user}
-            onBack={() => navigate('/profile')} 
-            onLeaveCommunity={(cid) => {
-                 leaveCommunity(cid);
-                 navigate('/profile'); 
-            }}
-            onJoinCommunity={joinCommunity}
-            onAddPost={addPost}
-            onUpdatePost={updatePost}
-            onDeletePost={deletePost}
-            onAddComment={addComment}
-            onFetchComments={fetchComments}
-            likedPostIds={likedPostIds}
-            toggleLikePost={toggleLikePost}
-            addNotification={addNotification}
-            timeAgo={timeAgo}
-        />
-    );
-};
-
-const FriendProfileRoute = ({ getUserById, getFriendPlants, levelInfo, removeFriend }: any) => {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const friend = getUserById(id);
+    const [friend, setFriend] = useState<User | null>(null);
     const [friendPlants, setFriendPlants] = useState<Plant[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     
     useEffect(() => {
-        if (friend && friend.id) {
-            getFriendPlants(friend.id).then((plants: Plant[]) => setFriendPlants(plants));
+        if (id) {
+            setIsLoading(true);
+            Promise.all([
+                getUser(id),
+                getFriendPlants(id)
+            ]).then(([userData, plantsData]) => {
+                setFriend(userData);
+                setFriendPlants(plantsData);
+                setIsLoading(false);
+            }).catch(() => {
+                setIsLoading(false);
+            });
         }
-    }, [friend, getFriendPlants]);
+    }, [id, getUser, getFriendPlants]);
 
+    if (isLoading) return <div className="p-10 text-center">Загрузка профиля...</div>;
     if (!friend) return <Navigate to="/profile" replace />;
 
     return (
         <FriendProfileScreen
             friend={friend}
             plants={friendPlants}
-            levelInfo={levelInfo}
             onBack={() => navigate('/profile')}
             onRemoveFriend={(fid) => {
                 removeFriend(fid);
@@ -181,24 +92,99 @@ const FriendProfileRoute = ({ getUserById, getFriendPlants, levelInfo, removeFri
 const AppContent: React.FC = () => {
     const {
         isLoading,
-        error, // Get error state
-        retryFetch, // Get retry function
-        plants, user, stats, levelInfo, achievements, communities, communityPosts, comments, careEvents,
-        likedPostIds, toggleLikePost, getUserById, pendingNotifications, clearPendingNotifications,
-        addPlant, updatePlant, deletePlant, logCareEvent, updateUser, joinCommunity, leaveCommunity,
-        createCommunity, addPost, updatePost, deletePost, addComment, fetchComments, searchUserByTelegram, addFriend,
-        removeFriend, pendingFriendRequests, handleFriendRequestAction, fetchCommunityPosts, getFriendPlants
+        error, 
+        retryFetch, 
+        plants, marketItems, user, levelInfo, achievements,
+        getUser, pendingNotifications, clearPendingNotifications,
+        addPlant, updatePlant, deletePlant, logCareEvent, updateUser, deleteAccount,
+        searchUserByTelegram, addFriend,
+        removeFriend, pendingFriendRequests, handleFriendRequestAction, getFriendPlants
     } = useMockData();
 
     const navigate = useNavigate();
+    const location = useLocation();
     const [isAddPlantModalOpen, setIsAddPlantModalOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [shownReminders, setShownReminders] = useState<Set<string>>(new Set());
+    
+    // Pull-to-Refresh State
+    const [pullStartY, setPullStartY] = useState(0);
+    const [pullDistance, setPullDistance] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const MIN_PULL_DISTANCE = 100;
+    
+    const [shownReminders, setShownReminders] = useState<Set<string>>(() => {
+        try {
+            const saved = localStorage.getItem('botgardener_shown_reminders');
+            return saved ? new Set(JSON.parse(saved)) : new Set();
+        } catch {
+            return new Set();
+        }
+    });
 
-    // Confetti logic
+    useEffect(() => {
+        try {
+            localStorage.setItem('botgardener_shown_reminders', JSON.stringify(Array.from(shownReminders)));
+        } catch (e) {
+            console.error("Failed to save reminders", e);
+        }
+    }, [shownReminders]);
+
+    const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
+        const newNotification = { ...notification, id: `${Date.now()}-${Math.random()}` };
+        setNotifications(prev => [...prev, newNotification]);
+    }, []);
+
+    // --- WEATHER CHECK ---
+    useEffect(() => {
+        if (plants.length > 0 && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                try {
+                    const res = await api.checkWeather(position.coords.latitude, position.coords.longitude);
+                    if (res.alert) {
+                        addNotification({
+                            message: res.alert,
+                            icon: <span className="text-xl">🌦</span>
+                        });
+                    }
+                } catch (e) {
+                    console.error("Weather check failed", e);
+                }
+            }, (err) => {
+                console.log("Geolocation denied or error", err);
+            });
+        }
+    }, [plants.length, addNotification]); 
+
+    useEffect(() => {
+        // @ts-ignore
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            
+            if (tg.isVersionAtLeast && tg.isVersionAtLeast('6.1')) {
+                if (location.pathname !== '/' && location.pathname !== '/profile' && location.pathname !== '/calendar' && location.pathname !== '/market') {
+                    tg.BackButton.show();
+                } else {
+                    tg.BackButton.hide();
+                }
+
+                const handleBack = () => {
+                    navigate(-1);
+                };
+
+                tg.BackButton.onClick(handleBack);
+
+                return () => {
+                    tg.BackButton.offClick(handleBack);
+                };
+            }
+        }
+    }, [location, navigate]);
+
     const prevLevelRef = useRef(levelInfo.level);
     useEffect(() => {
-        if (levelInfo.level > prevLevelRef.current) {
+        if (levelInfo.level > prevLevelRef.current && prevLevelRef.current !== 1) { 
             confetti({
                 particleCount: 150,
                 spread: 70,
@@ -206,18 +192,9 @@ const AppContent: React.FC = () => {
                 zIndex: 100,
                 colors: ['#22C55E', '#3B82F6', '#FACC15', '#EC4899']
             });
-            addNotification({
-                message: `Новый уровень! Теперь вы ${levelInfo.levelName}`,
-                icon: <span className="text-xl">🎉</span>
-            });
         }
         prevLevelRef.current = levelInfo.level;
     }, [levelInfo.level]);
-
-    const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
-        const newNotification = { ...notification, id: `${Date.now()}-${Math.random()}` };
-        setNotifications(prev => [...prev, newNotification]);
-    }, []);
 
     const careTypeDetails = {
         [CareType.WATER]: { 
@@ -248,7 +225,9 @@ const AppContent: React.FC = () => {
             const careTasks: { type: CareType; dueDate: Date | undefined }[] = [
                 {
                     type: CareType.WATER,
-                    dueDate: new Date(new Date(plant.lastWateredAt).getTime() + plant.wateringFrequencyDays * 24 * 60 * 60 * 1000)
+                    dueDate: plant.wateringFrequencyDays > 0 
+                        ? new Date(new Date(plant.lastWateredAt).getTime() + plant.wateringFrequencyDays * 24 * 60 * 60 * 1000)
+                        : undefined
                 },
                 { type: CareType.FERTILIZE, dueDate: plant.nextFertilizingDate },
                 { type: CareType.REPOT, dueDate: plant.nextRepottingDate },
@@ -258,15 +237,19 @@ const AppContent: React.FC = () => {
             careTasks.forEach(({ type, dueDate }) => {
                 if (dueDate) {
                     const taskDate = new Date(dueDate);
-                    taskDate.setHours(0, 0, 0, 0);
-                    const timeDiff = taskDate.getTime() - today.getTime();
-                    const daysUntil = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                    const daysUntil = differenceInCalendarDays(taskDate, today);
 
-                    if (daysUntil >= 0 && daysUntil <= 2) {
+                    if (daysUntil <= 2) {
                         const reminderKey = `${plant.id}-${type}-${taskDate.toISOString().split('T')[0]}`;
-                        if (!shownReminders.has(reminderKey)) {
+                        
+                        if (!shownReminders.has(reminderKey) && !newReminderKeys.has(reminderKey)) {
                             const { name, icon } = careTypeDetails[type];
-                            const dueText = daysUntil === 0 ? 'Сегодня' : (daysUntil === 1 ? 'Завтра' : `Через ${daysUntil} дня`);
+                            let dueText = '';
+                            if (daysUntil < 0) dueText = 'Просрочено!';
+                            else if (daysUntil === 0) dueText = 'Сегодня';
+                            else if (daysUntil === 1) dueText = 'Завтра';
+                            else dueText = `Через ${daysUntil} дня`;
+
                             newNotifications.push({
                                 id: `${reminderKey}-${Date.now()}`,
                                 message: `${dueText} пора ${name.toLowerCase()}: ${plant.name}`,
@@ -281,9 +264,13 @@ const AppContent: React.FC = () => {
 
         if (newNotifications.length > 0) {
             setNotifications(prev => [...prev, ...newNotifications]);
-            setShownReminders(prev => new Set([...prev, ...newReminderKeys]));
+            setShownReminders(prev => {
+                const updated = new Set(prev);
+                newReminderKeys.forEach(k => updated.add(k));
+                return updated;
+            });
         }
-    }, [plants, shownReminders]);
+    }, [plants]); 
 
     useEffect(() => {
         if (pendingNotifications.length > 0) {
@@ -296,35 +283,60 @@ const AppContent: React.FC = () => {
         setNotifications(prev => prev.filter(n => n.id !== id));
     };
 
+    const handleLogCare = (plantId: string, careType: CareType) => {
+        logCareEvent(plantId, careType);
+        setNotifications(prev => prev.filter(n => {
+            return !n.id.startsWith(`${plantId}-${careType}`);
+        }));
+    };
+
     const handleAddPlant = (newPlantData: any) => {
         addPlant(newPlantData);
         setIsAddPlantModalOpen(false);
     };
 
-    const timeAgo = useCallback((date: Date): string => {
-        const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-        let interval = seconds / 31536000;
-        if (interval > 1) return Math.floor(interval) + " г. назад";
-        interval = seconds / 2592000;
-        if (interval > 1) return Math.floor(interval) + " мес. назад";
-        interval = seconds / 86400;
-        if (interval > 1) return Math.floor(interval) + " д. назад";
-        interval = seconds / 3600;
-        if (interval > 1) return Math.floor(interval) + " ч. назад";
-        interval = seconds / 60;
-        if (interval > 1) return Math.floor(interval) + " мин. назад";
-        return "только что";
-    }, []);
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (window.scrollY === 0) {
+            setPullStartY(e.touches[0].clientY);
+        }
+    };
 
-    // --- Loading State ---
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (pullStartY > 0 && window.scrollY === 0 && !isRefreshing) {
+            const currentY = e.touches[0].clientY;
+            const diff = currentY - pullStartY;
+            if (diff > 0) {
+                setPullDistance(Math.min(diff * 0.5, 150)); 
+            }
+        }
+    };
+
+    const handleTouchEnd = async () => {
+        if (pullDistance > MIN_PULL_DISTANCE && !isRefreshing) {
+            setIsRefreshing(true);
+            setPullDistance(MIN_PULL_DISTANCE); 
+            triggerHaptic('medium');
+            if (retryFetch) {
+                await retryFetch();
+            }
+            setTimeout(() => {
+                setIsRefreshing(false);
+                setPullDistance(0);
+                setPullStartY(0);
+            }, 500);
+        } else {
+            setPullDistance(0);
+            setPullStartY(0);
+        }
+    };
+
     if (isLoading) {
-        return <InlineLoader />;
+        return <AppLoader />;
     }
 
-    // --- Error State ---
     if (error) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6 text-center">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6 text-center animate-fade-in">
                 <div className="text-6xl mb-4">🥀</div>
                 <h1 className="text-xl font-bold mb-2">Упс, что-то пошло не так</h1>
                 <p className="text-foreground/70 mb-6">{error}</p>
@@ -339,14 +351,36 @@ const AppContent: React.FC = () => {
     }
 
     return (
-        <div className="bg-background text-foreground min-h-screen font-sans">
-            <div className="fixed top-4 right-4 z-[60] w-full max-w-sm space-y-2">
+        <div 
+            className="bg-background text-foreground min-h-screen font-sans touch-pan-y"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+        >
+            <div 
+                className="fixed top-0 left-0 right-0 flex justify-center items-center pointer-events-none z-50 transition-all duration-200 ease-out overflow-hidden"
+                style={{ height: `${pullDistance}px`, opacity: pullDistance > 0 ? 1 : 0 }}
+            >
+                <div className="flex items-center gap-2 text-primary font-bold bg-card/80 backdrop-blur rounded-full px-4 py-2 shadow-lg mt-4">
+                    {isRefreshing ? (
+                        <>
+                            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                            <span>Обновление...</span>
+                        </>
+                    ) : (
+                        <span>{pullDistance > MIN_PULL_DISTANCE ? 'Отпустите для обновления' : 'Тяните вниз...'}</span>
+                    )}
+                </div>
+            </div>
+
+            <div className="fixed top-4 right-4 z-[60] w-full max-w-sm space-y-2 pointer-events-none">
                 {notifications.map(notification => (
-                    <NotificationToast
-                        key={notification.id}
-                        notification={notification}
-                        onDismiss={() => dismissNotification(notification.id)}
-                    />
+                    <div key={notification.id} className="pointer-events-auto">
+                        <NotificationToast
+                            notification={notification}
+                            onDismiss={() => dismissNotification(notification.id)}
+                        />
+                    </div>
                 ))}
             </div>
             <div className="max-w-lg mx-auto pb-20">
@@ -360,11 +394,18 @@ const AppContent: React.FC = () => {
                                         <PlantCard 
                                             key={plant.id} 
                                             plant={plant} 
-                                            onLogCare={(plantId, careType) => logCareEvent(plantId, careType)} 
+                                            onLogCare={handleLogCare} 
                                             onSelect={(p) => navigate(`/plants/${p.id}`)} 
                                         />
                                     ))}
                                 </div>
+                                {plants.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center py-20 text-center opacity-60">
+                                        <div className="text-4xl mb-2">🌱</div>
+                                        <p>Ваш сад пока пуст.</p>
+                                        <p className="text-sm">Нажмите "+" чтобы добавить первое растение!</p>
+                                    </div>
+                                )}
                                 <button 
                                     onClick={() => setIsAddPlantModalOpen(true)} 
                                     className="fixed bottom-20 right-5 bg-primary text-primary-foreground rounded-full p-4 shadow-lg hover:bg-primary/90 transition-transform hover:scale-110 z-20"
@@ -375,22 +416,18 @@ const AppContent: React.FC = () => {
                             </div>
                         } />
                         <Route path="/calendar" element={<div className="p-4"><CalendarScreen plants={plants} /></div>} />
+                        <Route path="/market" element={<MarketScreen items={marketItems} onAddItem={handleAddPlant} user={user} />} />
                         <Route path="/profile" element={
                             <div className="p-4">
                                 <ProfileScreen
                                     user={user}
-                                    stats={stats}
                                     levelInfo={levelInfo}
                                     achievements={achievements}
                                     plants={plants}
-                                    communities={communities}
-                                    onJoinCommunity={joinCommunity}
-                                    onLeaveCommunity={leaveCommunity}
-                                    onCreateCommunity={createCommunity}
                                     onUpdateUser={updateUser}
+                                    deleteAccount={deleteAccount}
                                     searchUserByTelegram={searchUserByTelegram}
                                     addFriend={addFriend}
-                                    onSelectCommunity={(c) => navigate(`/communities/${c.id}`)}
                                     onSelectFriend={(fid) => navigate(`/friends/${fid}`)}
                                     pendingFriendRequests={pendingFriendRequests}
                                     onFriendRequestAction={handleFriendRequestAction}
@@ -401,35 +438,14 @@ const AppContent: React.FC = () => {
                             <PlantDetailRoute 
                                 plants={plants} 
                                 onUpdatePlant={updatePlant} 
-                                onLogCareEvent={logCareEvent} 
+                                onLogCareEvent={handleLogCare} 
                                 onDeletePlant={deletePlant} 
-                            />
-                        } />
-                        <Route path="/communities/:id" element={
-                            <CommunityDetailRoute 
-                                communities={communities}
-                                communityPosts={communityPosts}
-                                comments={comments}
-                                user={user}
-                                leaveCommunity={leaveCommunity}
-                                joinCommunity={joinCommunity}
-                                addPost={addPost}
-                                updatePost={updatePost}
-                                deletePost={deletePost}
-                                addComment={addComment}
-                                fetchComments={fetchComments}
-                                likedPostIds={likedPostIds}
-                                toggleLikePost={toggleLikePost}
-                                addNotification={addNotification}
-                                timeAgo={timeAgo}
-                                fetchCommunityPosts={fetchCommunityPosts}
                             />
                         } />
                         <Route path="/friends/:id" element={
                             <FriendProfileRoute 
-                                getUserById={getUserById}
+                                getUser={getUser}
                                 getFriendPlants={getFriendPlants}
-                                levelInfo={levelInfo}
                                 removeFriend={removeFriend}
                             />
                         } />

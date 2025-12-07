@@ -1,52 +1,37 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Stats, LevelInfo, Achievement, Plant, User, Community, Friend } from '../types';
-import CommunitiesScreen from './CommunitiesScreen';
-import StatsScreen from './StatsScreen';
+import { LevelInfo, Achievement, Plant, User, DailyQuest } from '../types';
 import AchievementsScreen from './AchievementsScreen';
+import DailyQuestsWidget from './DailyQuestsWidget';
 import { 
     CakeIcon, 
     ProfileIcon as GenderIcon, GardenForkIcon, CloseIcon, SaveIcon, UploadIcon, AtSymbolIcon,
     SearchIcon,
-    CheckIcon
+    CheckIcon,
+    TrashIcon,
 } from './icons';
 import { compressImage } from '../utils';
 
 interface ProfileScreenProps {
     user: User;
-    stats: Stats;
     levelInfo: LevelInfo;
     achievements: (Achievement & { earnedAt?: Date })[];
     plants: Plant[];
-    communities: Community[];
-    onJoinCommunity: (communityId: string) => void;
-    onLeaveCommunity: (communityId: string) => void;
-    onCreateCommunity: (communityData: Omit<Community, 'id' | 'memberCount' | 'isMember'>) => void;
     onUpdateUser: (updatedData: any) => void;
-    // Updated type to allow Promise return
     searchUserByTelegram: (username: string) => Promise<User | null> | User | null;
     addFriend: (user: User) => void;
-    onSelectCommunity: (community: Community) => void;
     onSelectFriend: (friendId: string) => void;
     pendingFriendRequests: User[];
     onFriendRequestAction: (requestingUser: User, accept: boolean) => void;
+    deleteAccount: () => void;
 }
 
-type ProfileTab = 'stats' | 'achievements' | 'communities';
-
-const TABS = [
-  { id: 'stats', label: 'Статистика', icon: '📊' },
-  { id: 'achievements', label: 'Достижения', icon: '🏆' },
-  { id: 'communities', label: 'Сообщества', icon: '👥' },
-];
-
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ 
-    user, stats, levelInfo, achievements, plants, communities, 
-    onJoinCommunity, onLeaveCommunity, onCreateCommunity, onUpdateUser, 
-    searchUserByTelegram, addFriend, onSelectCommunity, onSelectFriend,
-    pendingFriendRequests, onFriendRequestAction
+    user, levelInfo, achievements,
+    onUpdateUser, 
+    searchUserByTelegram, addFriend, onSelectFriend,
+    pendingFriendRequests, onFriendRequestAction, deleteAccount
 }) => {
-    const [activeTab, setActiveTab] = useState<ProfileTab>('stats');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editableUser, setEditableUser] = useState(user);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,14 +41,53 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [showSearchResultActions, setShowSearchResultActions] = useState<string | null>(null);
     const [isLoadingSearch, setIsLoadingSearch] = useState(false);
     
-    // Upload state
+    const [quests, setQuests] = useState<DailyQuest[]>(user.dailyQuests || []);
+
+    useEffect(() => {
+        if(user.dailyQuests) setQuests(user.dailyQuests);
+    }, [user.dailyQuests]);
+
+    const handleQuestComplete = (questId: string) => {
+        setQuests(prev => prev.map(q => q.id === questId ? { ...q, isCompleted: true } : q));
+    };
+
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [isCompressing, setIsCompressing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
 
     useEffect(() => {
         setEditableUser(user);
     }, [user]);
+
+    useEffect(() => {
+        return () => {
+            if (editableUser.photoUrl && editableUser.photoUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(editableUser.photoUrl);
+            }
+        };
+    }, [editableUser.photoUrl]);
+
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (searchQuery.trim()) {
+                setIsLoadingSearch(true);
+                setShowSearchResultActions(null);
+                try {
+                    const result = await searchUserByTelegram(searchQuery);
+                    setSearchResult(result ? result : 'not_found');
+                } catch (e) {
+                    setSearchResult('not_found');
+                } finally {
+                    setIsLoadingSearch(false);
+                }
+            } else {
+                setSearchResult(null);
+            }
+        }, 600);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, searchUserByTelegram]);
 
     const handleOpenModal = () => {
         setEditableUser(user);
@@ -83,13 +107,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
         if (editableUser.telegramUsername) {
             formData.append('telegramUsername', editableUser.telegramUsername);
         }
-        
         if (photoFile) {
             formData.append('photo', photoFile);
         }
 
         onUpdateUser(formData);
-        // Note: isSaving will be reset when component unmounts or parent updates (optimistic UI would be better here but simple close is fine)
         setIsEditModalOpen(false);
         setIsSaving(false);
     };
@@ -102,7 +124,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 const compressedFile = await compressImage(originalFile);
                 setPhotoFile(compressedFile);
                 
-                // Show preview immediately
+                if (editableUser.photoUrl && editableUser.photoUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(editableUser.photoUrl);
+                }
+
                 const newPhotoUrl = URL.createObjectURL(compressedFile);
                 setEditableUser(prev => ({ ...prev, photoUrl: newPhotoUrl }));
             } catch (err) {
@@ -120,23 +145,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
         female: 'Женский',
     };
 
-    const handleSearch = async (query: string) => {
+    const handleSearchInput = (query: string) => {
         setSearchQuery(query);
-        setShowSearchResultActions(null);
-        if (!query.trim()) {
-            setSearchResult(null);
-            return;
-        }
-        
-        setIsLoadingSearch(true);
-        try {
-            const result = await searchUserByTelegram(query);
-            setSearchResult(result ? result : 'not_found');
-        } catch (e) {
-            setSearchResult('not_found');
-        } finally {
-            setIsLoadingSearch(false);
-        }
     };
 
     const handleAddFriend = (userToAdd: User) => {
@@ -147,52 +157,26 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setShowSearchResultActions(null);
     };
 
-    const isAlreadyFriend = (userId: string) => user.friends.some(f => f.id === userId);
-    
-    const handleTabClick = (tab: ProfileTab) => {
-        setActiveTab(tab);
+    const handleDeleteAccount = () => {
+        deleteAccount();
     };
 
-    const renderTabs = () => {
-        const activeIndex = TABS.findIndex(tab => tab.id === activeTab);
-        
-        return (
-            <div className="relative flex bg-card border border-accent rounded-full p-1 mb-6">
-                {/* Sliding Background */}
-                <div
-                    className="absolute top-1 bottom-1 bg-primary rounded-full transition-transform duration-300 ease-in-out"
-                    style={{
-                        width: `calc(100% / ${TABS.length})`,
-                        transform: `translateX(${activeIndex * 100}%)`
-                    }}
-                    aria-hidden="true"
-                />
-                
-                {TABS.map(({ id, label, icon }) => (
-                    <button 
-                        key={id}
-                        onClick={() => handleTabClick(id as ProfileTab)} 
-                        className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 px-1 py-2 text-sm font-semibold transition-colors duration-300 ${
-                            activeTab === id 
-                            ? 'text-primary-foreground' 
-                            : 'text-foreground/80 hover:text-foreground'
-                        }`}
-                        aria-pressed={activeTab === id}
-                    >
-                        <span className="text-lg">{icon}</span>
-                        <span>{label}</span>
-                    </button>
-                ))}
-            </div>
-        );
-    }
+    const isAlreadyFriend = (userId: string) => user.friends.some(f => f.id === userId);
+    
+    // AI Requests Display (Hard limit 5)
+    const requestsUsed = user.aiRequestsCount || 0;
+    const requestsLimit = 5;
+    const isLimitReached = requestsUsed >= requestsLimit;
+    const percentUsed = Math.min(100, (requestsUsed / requestsLimit) * 100);
     
     return (
         <div className="animate-fade-in">
             <div className="relative">
                 <div className="flex flex-col items-center mb-6">
-                    <img src={user.photoUrl} alt="Аватар пользователя" className="w-24 h-24 rounded-full object-cover mb-3 border-4 border-primary/50" />
-                    <h1 className="text-2xl font-bold">{user.name}</h1>
+                    <img src={user.photoUrl || 'https://placehold.co/150'} alt="Аватар пользователя" className="w-24 h-24 rounded-full object-cover mb-3 border-4 border-primary/50" />
+                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        {user.name}
+                    </h1>
                     <p className="text-sm text-foreground/70">{levelInfo.levelName} - Уровень {levelInfo.level}</p>
                 </div>
                  <button onClick={handleOpenModal} className="absolute top-0 right-0 p-2 rounded-full hover:bg-accent">
@@ -200,6 +184,26 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                  </button>
             </div>
             
+            {/* Usage Stats Block */}
+            <div className={`rounded-xl p-4 mb-6 border bg-card border-accent`}>
+                <h3 className="font-bold text-lg mb-2">AI Ассистент</h3>
+                <div className="flex justify-between text-sm mb-1">
+                    <span className="text-foreground/70">Использовано за месяц</span>
+                    <span className={isLimitReached ? "text-red-500 font-bold" : "text-primary font-bold"}>
+                        {requestsUsed} / {requestsLimit}
+                    </span>
+                </div>
+                <div className="w-full bg-accent rounded-full h-2.5 mb-2">
+                    <div 
+                        className={`h-2.5 rounded-full ${isLimitReached ? 'bg-red-500' : 'bg-primary'}`} 
+                        style={{ width: `${percentUsed}%` }}
+                    ></div>
+                </div>
+                <p className="text-xs text-foreground/50 text-center">
+                    {isLimitReached ? "Лимит исчерпан. Обновление 1-го числа." : "Доступно для диагностики и чата с растениями."}
+                </p>
+            </div>
+
             <div className="bg-card border border-accent rounded-lg p-4 mb-6 space-y-4">
                 <div className="space-y-2 text-sm text-foreground/80">
                      <div className="flex items-center gap-2">
@@ -223,6 +227,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </div>
             </div>
 
+            <DailyQuestsWidget quests={quests} onQuestCompleted={handleQuestComplete} />
+
             <div className="mb-6">
                 <div className="flex justify-between items-center mb-3">
                      <h3 className="font-bold text-lg">
@@ -239,7 +245,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             type="text"
                             placeholder="Поиск по имени Telegram..."
                             value={searchQuery}
-                            onChange={(e) => handleSearch(e.target.value)}
+                            onChange={(e) => handleSearchInput(e.target.value)}
                             className="w-full bg-accent border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary"
                             autoFocus
                         />
@@ -253,7 +259,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             <p className="text-center text-foreground/70 p-3 bg-card border border-accent rounded-lg">Такого пользователя нет</p>
                         ) : (
                             <div className="relative bg-card border border-accent rounded-lg p-3 flex items-center gap-3 cursor-pointer" onClick={() => setShowSearchResultActions(searchResult.id)}>
-                                <img src={searchResult.photoUrl} alt={searchResult.name} className="w-12 h-12 rounded-full object-cover" />
+                                <img src={searchResult.photoUrl || 'https://placehold.co/150'} alt={searchResult.name} className="w-12 h-12 rounded-full object-cover" />
                                 <div>
                                     <p className="font-bold">{searchResult.name}</p>
                                     <p className="text-sm text-foreground/70">{searchResult.telegramUsername}</p>
@@ -303,7 +309,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         {pendingFriendRequests.map(request => (
                             <div key={request.id} className="bg-card border border-primary/30 rounded-lg p-3">
                                 <div className="flex items-center gap-3">
-                                    <img src={request.photoUrl} alt={request.name} className="w-12 h-12 rounded-full object-cover" />
+                                    <img src={request.photoUrl || 'https://placehold.co/150'} alt={request.name} className="w-12 h-12 rounded-full object-cover" />
                                     <p className="flex-grow text-sm">
                                         <span className="font-bold">{request.name}</span> хочет добавить вас в друзья.
                                     </p>
@@ -339,19 +345,26 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             onClick={() => onSelectFriend(friend.id)}
                             className="flex flex-col items-center flex-shrink-0 w-20 text-center group"
                         >
-                            <img src={friend.photoUrl} alt={friend.name} className="w-16 h-16 rounded-full object-cover mb-1 border-2 border-accent group-hover:border-primary transition-colors" />
+                            <img src={friend.photoUrl || 'https://placehold.co/150'} alt={friend.name} className="w-16 h-16 rounded-full object-cover mb-1 border-2 border-accent group-hover:border-primary transition-colors" />
                             <span className="text-xs truncate w-full group-hover:text-primary transition-colors">{friend.name}</span>
                         </button>
                     ))}
                 </div>
             </div>
             
-            {renderTabs()}
-            
-            <div>
-                {activeTab === 'stats' && <StatsScreen stats={stats} plants={plants} />}
-                {activeTab === 'achievements' && <AchievementsScreen achievements={achievements} />}
-                {activeTab === 'communities' && <CommunitiesScreen communities={communities} onJoin={onJoinCommunity} onLeave={onLeaveCommunity} onCreate={onCreateCommunity} onSelect={onSelectCommunity} />}
+            <AchievementsScreen achievements={achievements} />
+
+            <div className="mt-10 pt-6 border-t border-accent">
+                <button
+                    onClick={() => setIsDeleteAccountOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors font-semibold"
+                >
+                    <TrashIcon className="w-5 h-5" />
+                    Удалить аккаунт
+                </button>
+                <p className="text-xs text-center text-foreground/40 mt-2">
+                    Внимание: это действие удалит все ваши данные, растения и историю навсегда.
+                </p>
             </div>
 
             {isEditModalOpen && (
@@ -368,7 +381,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             <div className="flex flex-col items-center">
                                 <div className="relative">
                                     <input type="file" ref={fileInputRef} onChange={handlePhotoChange} style={{ display: 'none' }} accept="image/*" />
-                                    <img src={editableUser.photoUrl} alt="Аватар" className="w-24 h-24 rounded-full object-cover mb-3 border-4 border-primary/50" />
+                                    <img src={editableUser.photoUrl || 'https://placehold.co/150'} alt="Аватар" className="w-24 h-24 rounded-full object-cover mb-3 border-4 border-primary/50" />
                                     <button 
                                         onClick={() => fileInputRef.current?.click()} 
                                         disabled={isCompressing}
@@ -418,6 +431,32 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 rounded-full text-sm font-semibold hover:bg-accent transition-colors">Отмена</button>
                             <button onClick={handleSaveChanges} disabled={isSaving || isCompressing} className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50">
                                 <SaveIcon className="w-4 h-4"/> {isSaving ? 'Сохранение...' : 'Сохранить'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isDeleteAccountOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsDeleteAccountOpen(false)}>
+                    <div className="bg-card rounded-2xl w-full max-w-sm p-6 animate-fade-in-up text-center border-2 border-red-500" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-xl font-bold mb-2 text-red-500">Удалить аккаунт?</h2>
+                        <p className="text-foreground/80 mb-6">
+                            Вы уверены? <br/>
+                            <span className="font-bold">Все ваши растения, достижения и история будут удалены безвозвратно.</span>
+                        </p>
+                        <div className="flex justify-center gap-4">
+                            <button 
+                                onClick={() => setIsDeleteAccountOpen(false)} 
+                                className="px-6 py-2 rounded-full text-sm font-semibold hover:bg-accent transition-colors"
+                            >
+                                Отмена
+                            </button>
+                            <button 
+                                onClick={handleDeleteAccount} 
+                                className="px-6 py-2 bg-red-600 text-white rounded-full text-sm font-semibold hover:bg-red-700 transition-colors"
+                            >
+                                Удалить навсегда
                             </button>
                         </div>
                     </div>

@@ -1,4 +1,5 @@
-import React, { useState, FormEvent, useRef } from 'react';
+
+import React, { useState, FormEvent, useRef, useEffect } from 'react';
 import { CommunityPost } from '../types';
 import { CloseIcon, UploadIcon, SaveIcon } from './icons';
 import { compressImage } from '../utils';
@@ -16,6 +17,15 @@ const EditPostModal: React.FC<EditPostModalProps> = ({ post, onClose, onSave }) 
   const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Memory Leak Fix
+  useEffect(() => {
+      return () => {
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
+      };
+  }, [photoUrl]);
+
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const originalFile = e.target.files[0];
@@ -23,10 +33,18 @@ const EditPostModal: React.FC<EditPostModalProps> = ({ post, onClose, onSave }) 
       try {
           const compressedFile = await compressImage(originalFile);
           setPhotoFile(compressedFile);
+          
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
           setPhotoUrl(URL.createObjectURL(compressedFile));
       } catch (err) {
           console.error("Compression failed", err);
           setPhotoFile(originalFile);
+          
+          if (photoUrl && photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(photoUrl);
+          }
           setPhotoUrl(URL.createObjectURL(originalFile));
       } finally {
           setIsCompressing(false);
@@ -35,6 +53,9 @@ const EditPostModal: React.FC<EditPostModalProps> = ({ post, onClose, onSave }) 
   };
 
   const handleRemovePhoto = () => {
+    if (photoUrl && photoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(photoUrl);
+    }
     setPhotoUrl(undefined);
     setPhotoFile(null);
     if(fileInputRef.current) {

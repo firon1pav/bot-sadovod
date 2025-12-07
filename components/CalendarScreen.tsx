@@ -1,9 +1,8 @@
 
-
 import React, { useState, useMemo } from 'react';
 import { Plant, CareType } from '../types';
 import { WaterDropIcon, ScissorsIcon, SpadeIcon, FertilizerIcon, BackIcon, MoreHorizontalIcon } from './icons';
-import { startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, format, isSameDay, isToday } from 'date-fns';
+import { startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, format, isSameDay, isToday, addDays, differenceInCalendarDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 interface CalendarScreenProps {
@@ -33,21 +32,78 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ plants }) => {
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  // Generate all upcoming events
+  // Generate all upcoming events for the current week range
   const allEvents = useMemo(() => {
     const events: CalendarEvent[] = [];
-    plants.forEach(plant => {
-         // Water
-         const nextWater = new Date(new Date(plant.lastWateredAt).getTime() + plant.wateringFrequencyDays * 24 * 60 * 60 * 1000);
-         events.push({ plantId: plant.id, plantName: plant.name, careType: CareType.WATER, dueDate: nextWater });
+    
+    // Define the view window
+    const viewStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const viewEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+    viewStart.setHours(0, 0, 0, 0);
+    viewEnd.setHours(23, 59, 59, 999);
 
-         // Others
-         if (plant.nextFertilizingDate) events.push({ plantId: plant.id, plantName: plant.name, careType: CareType.FERTILIZE, dueDate: new Date(plant.nextFertilizingDate) });
-         if (plant.nextRepottingDate) events.push({ plantId: plant.id, plantName: plant.name, careType: CareType.REPOT, dueDate: new Date(plant.nextRepottingDate) });
-         if (plant.nextTrimmingDate) events.push({ plantId: plant.id, plantName: plant.name, careType: CareType.TRIM, dueDate: new Date(plant.nextTrimmingDate) });
+    plants.forEach(plant => {
+         // --- WATERING (Recurring) ---
+         // CRITICAL FIX: Prevent infinite loop if frequency is 0 or negative
+         if (plant.wateringFrequencyDays && plant.wateringFrequencyDays >= 1) {
+             const lastWatered = new Date(plant.lastWateredAt);
+             lastWatered.setHours(0,0,0,0);
+
+             // Start projecting events from the last watered date
+             let iterDate = addDays(lastWatered, plant.wateringFrequencyDays);
+             
+             // Optimization: Fast-forward to near viewStart using Calendar Days diff
+             if (iterDate.getTime() < viewStart.getTime()) {
+                 const diffDays = differenceInCalendarDays(viewStart, iterDate);
+                 // Round up to nearest frequency multiple
+                 const jumps = Math.ceil(diffDays / plant.wateringFrequencyDays);
+                 if (jumps > 0) {
+                     iterDate = addDays(iterDate, jumps * plant.wateringFrequencyDays);
+                 }
+             }
+
+             // Generate events until we pass the viewEnd
+             // SAFETY BREAK: Limit iterations to prevent infinite loops (max 30 events per plant per week)
+             let iterations = 0;
+             while (iterDate <= viewEnd && iterations < 30) {
+                 // Check if valid range
+                 if (iterDate >= lastWatered) {
+                     events.push({ 
+                         plantId: plant.id, 
+                         plantName: plant.name, 
+                         careType: CareType.WATER, 
+                         dueDate: new Date(iterDate) 
+                     });
+                 }
+                 // IMPORTANT: Always advance date, ensuring we break the loop
+                 iterDate = addDays(iterDate, plant.wateringFrequencyDays);
+                 iterations++;
+             }
+         }
+
+         // --- OTHER EVENTS (Single scheduled dates) ---
+         // For these, we just check if the specific date falls in the range
+         if (plant.nextFertilizingDate) {
+             const date = new Date(plant.nextFertilizingDate);
+             if (date >= viewStart && date <= viewEnd) {
+                 events.push({ plantId: plant.id, plantName: plant.name, careType: CareType.FERTILIZE, dueDate: date });
+             }
+         }
+         if (plant.nextRepottingDate) {
+             const date = new Date(plant.nextRepottingDate);
+             if (date >= viewStart && date <= viewEnd) {
+                 events.push({ plantId: plant.id, plantName: plant.name, careType: CareType.REPOT, dueDate: date });
+             }
+         }
+         if (plant.nextTrimmingDate) {
+             const date = new Date(plant.nextTrimmingDate);
+             if (date >= viewStart && date <= viewEnd) {
+                 events.push({ plantId: plant.id, plantName: plant.name, careType: CareType.TRIM, dueDate: date });
+             }
+         }
     });
     return events;
-  }, [plants]);
+  }, [plants, currentDate]);
 
   const getEventsForDate = (date: Date) => {
       return allEvents.filter(e => isSameDay(e.dueDate, date));

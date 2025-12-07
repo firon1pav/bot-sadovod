@@ -1,9 +1,8 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Plant } from '../types';
-import { CloseIcon, ChatBubbleIcon, SparklesIcon } from './icons';
-import { chatWithPlantExpert } from '../services/ai';
+import { CloseIcon, ChatBubbleIcon, SparklesIcon, TrashIcon } from './icons';
+import { api } from '../services/api';
 
 interface AiChatModalProps {
     plant: Plant;
@@ -17,28 +16,55 @@ interface Message {
 }
 
 const AiChatModal: React.FC<AiChatModalProps> = ({ plant, onClose }) => {
-    const [messages, setMessages] = useState<Message[]>([
-        { id: 'welcome', sender: 'ai', text: `Привет! Я твой ботаник-ассистент. Что тебя интересует насчет ${plant.name}?` }
-    ]);
+    const initialMessage: Message = { 
+        id: 'welcome', 
+        sender: 'ai', 
+        text: `Привет! Я твой личный ассистент-ботаник. Что тебя интересует насчет ${plant.name}?` 
+    };
+
+    const [messages, setMessages] = useState<Message[]>([initialMessage]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    const scrollToBottom = () => {
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 100);
+    };
+
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        scrollToBottom();
     }, [messages, isTyping]);
+
+    const handleClearHistory = () => {
+        if (window.confirm('Очистить историю переписки?')) {
+            setMessages([initialMessage]);
+        }
+    };
 
     const handleSend = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!inputText.trim()) return;
 
         const userMsg: Message = { id: Date.now().toString(), sender: 'user', text: inputText };
-        setMessages(prev => [...prev, userMsg]);
+        const currentMessages = [...messages, userMsg];
+        setMessages(currentMessages);
         setInputText('');
         setIsTyping(true);
 
         try {
-            const aiResponseText = await chatWithPlantExpert(userMsg.text, plant);
+            // Prepare history for context retention
+            const history = currentMessages
+                .filter(m => m.id !== 'welcome')
+                .map(m => ({ sender: m.sender, text: m.text }));
+
+            // Exclude the message we just added, as it's sent as the 'message' param
+            const historyForBackend = history.slice(0, -1);
+
+            // DIRECTLY CALL API instead of the simple wrapper to ensure history is passed
+            const aiResponseText = await api.chatWithPlant(userMsg.text, plant.id, historyForBackend);
+            
             const aiMsg: Message = { 
                 id: (Date.now() + 1).toString(), 
                 sender: 'ai', 
@@ -72,9 +98,18 @@ const AiChatModal: React.FC<AiChatModalProps> = ({ plant, onClose }) => {
                              <p className="text-xs text-foreground/50">BotGardener AI</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-accent">
-                        <CloseIcon className="w-5 h-5"/>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={handleClearHistory} 
+                            className="p-2 rounded-full hover:bg-red-500/10 text-foreground/60 hover:text-red-500 transition-colors"
+                            title="Очистить историю"
+                        >
+                            <TrashIcon className="w-5 h-5"/>
+                        </button>
+                        <button onClick={onClose} className="p-2 rounded-full hover:bg-accent text-foreground/80">
+                            <CloseIcon className="w-5 h-5"/>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Messages */}
@@ -100,7 +135,8 @@ const AiChatModal: React.FC<AiChatModalProps> = ({ plant, onClose }) => {
                              </div>
                         </div>
                     )}
-                    <div ref={messagesEndRef} />
+                    {/* Spacer for keyboard / scrolling */}
+                    <div ref={messagesEndRef} className="h-4" />
                 </div>
 
                 {/* Input */}
@@ -113,6 +149,7 @@ const AiChatModal: React.FC<AiChatModalProps> = ({ plant, onClose }) => {
                             placeholder="Спросите что-нибудь..."
                             className="w-full bg-accent border-none rounded-full pl-4 pr-12 py-3 focus:ring-2 focus:ring-primary text-sm"
                             disabled={isTyping}
+                            onFocus={scrollToBottom}
                         />
                         <button 
                             type="submit" 

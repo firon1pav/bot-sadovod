@@ -1,3 +1,4 @@
+
 import * as express from 'express';
 
 // Mocking Prisma Client types to fix missing generation errors
@@ -16,6 +17,12 @@ declare module '@prisma/client' {
     communities: any[];
     plants: Plant[];
     careEvents: any[];
+    dailyQuests: DailyQuest[];
+    
+    // AI Limits
+    aiRequestsCount: number;
+    aiLastResetDate: Date | null;
+    // Removed isSubscribed
   }
 
   export interface Plant {
@@ -36,6 +43,23 @@ declare module '@prisma/client' {
     nextTrimmingDate: Date | null;
     photoUrl: string;
     createdAt: Date;
+    isSwapAvailable: boolean;
+    isGiveaway: boolean;
+    // Market fields
+    isForSale: boolean;
+    price: number | null;
+    city: string | null;
+    description: string | null;
+  }
+  
+  export interface DailyQuest {
+      id: string;
+      userId: string;
+      title: string;
+      description: string;
+      xpReward: number;
+      isCompleted: boolean;
+      date: string; // YYYY-MM-DD
   }
   
   export interface Community {
@@ -96,8 +120,10 @@ declare module '@prisma/client' {
     postLike: any;
     comment: any;
     friendRequest: any;
-    $transaction(args: any[]): Promise<any>;
+    dailyQuest: any;
+    $transaction(arg: any): Promise<any>;
     $disconnect(): Promise<void>;
+    $queryRaw(arg: any, ...args: any[]): Promise<any>;
   }
 }
 
